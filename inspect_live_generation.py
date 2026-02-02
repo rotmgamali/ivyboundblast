@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(__file__))
 
 from generators.email_generator import EmailGenerator
 # Need to mock the scraper if I can't import easily or just use real one
-from scrapers.school_scraper import scrape_website_text
+from automation_scrapers.school_scraper import scrape_website_text
 
 def inspect_content():
     db_path = "mailreef_automation/campaign.db"
