@@ -16,6 +16,10 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(BASE_DIR))
 
+from logger_util import get_logger
+load_dotenv()
+logger = get_logger("EMAIL_GENERATOR")
+
 # Try to import the scraper, fallback if missing
 try:
     # First attempt: Root-relative import (Standard for our Docker setup)
@@ -31,11 +35,6 @@ except ImportError as e:
         logging.warning(f"⚠️ Could not import school_scraper: {e}")
         logging.warning(f"🔍 sys.path currently includes: {sys.path[:3]}...")
         scrape_website_text = None
-
-from logger_util import get_logger
-
-load_dotenv()
-logger = get_logger("EMAIL_GENERATOR")
 
 class EmailGenerator:
     """
