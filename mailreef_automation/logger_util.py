@@ -4,8 +4,8 @@ from datetime import datetime
 from pathlib import Path
 
 # Base directory for logs
-LOGS_DIR = Path("/Users/mac/Desktop/Ivybound/mailreef_automation/logs")
-LOGS_DIR.mkdir(exist_ok=True)
+LOGS_DIR = Path(__file__).parent / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOGS_DIR / "automation.log"
 
 def get_logger(name: str):

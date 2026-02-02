@@ -49,7 +49,9 @@ def main():
             base_url=cfg.MAILREEF_API_BASE
         )
         
-        contacts = ContactManager()
+        # Use relative path anchored to project root
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "campaign.db")
+        contacts = ContactManager(database_path=db_path)
         
         # Check for stale locks from previous crashes
         logger.info("Audit: Checking for stale lead locks...")
