@@ -25,15 +25,6 @@ def main():
     try:
         logger.info("Initializing Mailreef Email Automation System")
         
-        # Diagnostics for Cloud Environment
-        env_keys = ["MAILREEF_API_KEY", "OPENAI_API_KEY", "GOOGLE_SHEETS_CREDENTIALS"]
-        for key in env_keys:
-            val = os.environ.get(key)
-            if val:
-                logger.info(f"🔍 Environment Check: {key} is PRESENT (Length: {len(val)})")
-            else:
-                logger.warning(f"⚠️ Environment Check: {key} is MISSING from os.environ")
-        
         class ConfigWrapper:
             pass
         
