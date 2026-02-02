@@ -20,10 +20,12 @@ from sheets_integration import GoogleSheetsClient
 from generators.email_generator import EmailGenerator
 import lock_util
 
-load_dotenv()
-
 # Configuration
 MAILREEF_API_KEY = os.getenv("MAILREEF_API_KEY")
+if not MAILREEF_API_KEY:
+    load_dotenv()
+    MAILREEF_API_KEY = os.getenv("MAILREEF_API_KEY")
+
 STATE_FILE = "mailreef_automation/logs/reply_watcher_state.json"
 CHECK_INTERVAL_MINUTES = 5
 

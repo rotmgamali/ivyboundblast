@@ -52,12 +52,13 @@ WEEKEND_DAY_WINDOWS = [
 QUIET_HOURS = {"start": 21, "end": 5}
 
 # ==================== MAILREEF API CONFIG ====================
-MAILREEF_API_BASE = "https://api.mailreef.com"
+MAILREEF_API_BASE = os.environ.get("MAILREEF_API_BASE") or "https://api.mailreef.com"
 MAILREEF_API_KEY = os.environ.get("MAILREEF_API_KEY")
 
-# Rate limiting per inbox
-MAX_EMAILS_PER_HOUR_PER_INBOX = 5
-MIN_MINUTES_BETWEEN_EMAILS = 12  # Ensures natural spacing
+# Check if key is missing and try to reload if local
+if not MAILREEF_API_KEY:
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
+    MAILREEF_API_KEY = os.environ.get("MAILREEF_API_KEY")
 
 # ==================== CAMPAIGN SETTINGS ====================
 CAMPAIGN_CONFIG = {
