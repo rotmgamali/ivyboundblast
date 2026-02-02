@@ -1,6 +1,7 @@
 requests
 apscheduler
-pytz
+tzdata>=2023.3
+pytz>=2023.3
 openai
 beautifulsoup4
 gspread
