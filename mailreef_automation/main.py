@@ -8,10 +8,10 @@ import time
 import sys
 import os
 
-# Add project root to path
+# Add project root to path BEFORE any other imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import config
+import automation_config
 from mailreef_client import MailreefClient
 from scheduler import EmailScheduler
 from contact_manager import ContactManager
@@ -34,10 +34,10 @@ def main():
             pass
         
         cfg = ConfigWrapper()
-        # Loading attributes from config module to cfg object
-        for name in dir(config):
+        # Loading attributes from automation_config module to cfg object
+        for name in dir(automation_config):
             if not name.startswith("__"):
-                setattr(cfg, name, getattr(config, name))
+                setattr(cfg, name, getattr(automation_config, name))
                 
         # Check API key
         if not cfg.MAILREEF_API_KEY:

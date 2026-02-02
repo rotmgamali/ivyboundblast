@@ -12,7 +12,7 @@ sys.path.insert(0, current_dir)
 from contact_manager import ContactManager
 from scheduler import EmailScheduler
 from logger_util import get_logger
-import config
+import automation_config
 
 logger = get_logger("VERIFY_SCRIPT")
 
@@ -58,8 +58,8 @@ def main():
     class ConfigWrapper:
         pass
     cfg = ConfigWrapper()
-    for name in dir(config):
-        if not name.startswith("__"): setattr(cfg, name, getattr(config, name))
+    for name in dir(automation_config):
+        if not name.startswith("__"): setattr(cfg, name, getattr(automation_config, name))
 
     scheduler = EmailScheduler(MockMailreef(), cm, cfg)
     
