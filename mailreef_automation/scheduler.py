@@ -145,7 +145,7 @@ class EmailScheduler:
                     
                     # If send_time is in the past for today, we might want to schedule for tomorrow? 
                     # But the daily queue runs at 5 AM, so this should generally be future.
-                    logger.debug(f"Generated slot for inbox {inbox_id} at {send_time} (Window: {window_start}:00)")
+                    # logger.debug(f"Generated slot for inbox {inbox_id} at {send_time} (Window: {window_start}:00)")
                     
                     slots.append({
                         "inbox_id": inbox_id,
