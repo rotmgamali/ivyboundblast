@@ -1,0 +1,117 @@
+"""
+Main entry point for the email automation system
+Run this to start the automation
+"""
+
+import logging
+import time
+import os
+import config
+from mailreef_client import MailreefClient
+from scheduler import EmailScheduler
+from contact_manager import ContactManager
+from monitor import DeliverabilityMonitor
+from logger_util import get_logger
+import lock_util
+
+# Configure logging
+logger = get_logger("SYSTEM_MAIN")
+
+def main():
+    """Initialize and start the email automation"""
+    # Safety first: Ensure only one instance runs
+    lock_util.ensure_singleton('sender')
+    
+    try:
+        logger.info("Initializing Mailreef Email Automation System")
+    
+        # Initialize components
+        # Using config module directly since it has global vars, or wrapping in class if needed.
+        # The config.py provided has global variables, but I can wrap them in a simple object 
+        # to pass to classes that expect a config object.
+        
+        class ConfigWrapper:
+            pass
+        
+        cfg = ConfigWrapper()
+        # Loading attributes from config module to cfg object
+        for name in dir(config):
+            if not name.startswith("__"):
+                setattr(cfg, name, getattr(config, name))
+                
+        # Check API key
+        if not cfg.MAILREEF_API_KEY:
+            logger.error("MAILREEF_API_KEY environment variable not set.")
+            return
+        
+        mailreef = MailreefClient(
+            api_key=cfg.MAILREEF_API_KEY,
+            base_url=cfg.MAILREEF_API_BASE
+        )
+        
+        contacts = ContactManager()
+        
+        # Check for stale locks from previous crashes
+        logger.info("Audit: Checking for stale lead locks...")
+        contacts.scan_stale_locks()
+        
+        scheduler = EmailScheduler(
+            mailreef_client=mailreef,
+            contact_manager=contacts,
+            config=cfg
+        )
+        
+        monitor = DeliverabilityMonitor(mailreef, cfg)
+        
+        # Validate setup
+        logger.info("Validating inbox configuration...")
+        try:
+            inboxes = mailreef.get_inboxes()
+            
+            if len(inboxes) < cfg.TOTAL_INBOXES:
+                logger.warning(f"Expected {cfg.TOTAL_INBOXES} inboxes, found {len(inboxes)}")
+            
+            # Check inbox health
+            logger.info("Checking inbox health...")
+            for inbox in inboxes:
+                # Note: get_inbox_status in provided client code returns a dict.
+                # Assuming 'deliverability_score' exists or similar metric. 
+                # If not, we skip this check or catch key error.
+                try:
+                    # Optimized to avoid 95 API calls on startup if not strictly necessary,
+                    # but following the prompt's structure:
+                    status = mailreef.get_inbox_status(inbox["id"])
+                    if status.get("deliverability_score", 100) < 80:
+                        logger.warning(f"Inbox {inbox['id']} has low deliverability: {status}")
+                except Exception as e:
+                    logger.warning(f"Could not check status for inbox {inbox['id']}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Failed to fetch inboxes: {e}")
+            # Depending on severity, might exit or continue
+        
+        # Start the scheduler
+        logger.info("Starting email scheduler...")
+        scheduler.start()
+        
+        # Start monitoring
+        logger.info("Starting deliverability monitoring...")
+        monitor.start()
+        
+        logger.info("Email automation system is now running")
+        logger.info(f"Daily capacity: {contacts.calculate_daily_capacity()}")
+        
+        # Keep the main thread alive
+        while True:
+            time.sleep(1)
+            # input("Press Ctrl+C to stop...\n") 
+            # input() blocks in some environments, sleep loop is safer for daemon-like behavior
+    except KeyboardInterrupt:
+        logger.info("Shutting down...")
+    finally:
+        if 'scheduler' in locals(): scheduler.stop()
+        if 'monitor' in locals(): monitor.stop()
+        lock_util.release_lock('sender')
+
+if __name__ == "__main__":
+    main()

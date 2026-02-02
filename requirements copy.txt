@@ -1,0 +1,26 @@
+# Ivy Bound School Partnership Campaign Dependencies
+
+# Core dependencies
+requests>=2.28.0
+beautifulsoup4>=4.11.0
+html2text>=2020.1.16
+
+# Optional: For enhanced HTML parsing
+lxml>=4.9.0
+
+# Optional: For proxy support
+urllib3>=1.26.0
+
+# Development dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Email sending (when ready to send)
+# Amazon SES
+# boto3>=1.26.0
+
+# SendGrid
+# sendgrid>=6.10.0
+
+# Mailgun
+# mailgunpy>=1.0.0

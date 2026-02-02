@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  sender:
+    build: .
+    container_name: ivybound-sender
+    command: python mailreef_automation/main.py
+    restart: always
+    volumes:
+      - ./mailreef_automation/campaign.db:/app/mailreef_automation/campaign.db
+      - ./mailreef_automation/logs:/app/mailreef_automation/logs
+      - ./credentials:/app/credentials
+    env_file:
+      - .env
+
+  watcher:
+    build: .
+    container_name: ivybound-watcher
+    command: python reply_watcher.py --daemon
+    restart: always
+    volumes:
+      - ./mailreef_automation/campaign.db:/app/mailreef_automation/campaign.db
+      - ./mailreef_automation/logs:/app/mailreef_automation/logs
+      - ./credentials:/app/credentials
+    env_file:
+      - .env

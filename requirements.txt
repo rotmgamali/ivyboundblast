@@ -1,0 +1,10 @@
+requests
+apscheduler
+pytz
+openai
+beautifulsoup4
+gspread
+google-auth
+google-auth-oauthlib
+python-dotenv
+httpx
