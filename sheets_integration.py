@@ -53,17 +53,35 @@ class GoogleSheetsClient:
         self._authenticate()
     
     def _authenticate(self):
-        """Authenticate with Google using OAuth credentials."""
+        """Authenticate with Google using OAuth credentials or a service account/token from env."""
         creds = None
         
-        # Load existing token if available
-        if TOKEN_FILE.exists():
+        # 1. Try to load from environment variable (Best for Railway/Cloud)
+        env_creds = os.environ.get("GOOGLE_SHEETS_CREDENTIALS")
+        if env_creds:
+            try:
+                creds_dict = json.loads(env_creds)
+                # Check if it's an authorized user token or a service account
+                if "refresh_token" in creds_dict:
+                    creds = Credentials.from_authorized_user_info(creds_dict, SCOPES)
+                    logger.info("✓ Authenticated via GOOGLE_SHEETS_CREDENTIALS (User Token)")
+                else:
+                    # Fallback to service account if that's what's provided
+                    from google.oauth2 import service_account
+                    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+                    logger.info("✓ Authenticated via GOOGLE_SHEETS_CREDENTIALS (Service Account)")
+            except Exception as e:
+                logger.warning(f"Failed to load credentials from environment: {e}")
+
+        # 2. Fallback to local token file (Best for local development)
+        if not creds and TOKEN_FILE.exists():
             try:
                 creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+                logger.info("✓ Authenticated via local token file")
             except Exception as e:
                 logger.warning(f"Could not load token: {e}")
         
-        # If no valid credentials, need to authenticate
+        # 3. If no valid credentials, run local OAuth flow
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 try:
@@ -73,15 +91,15 @@ class GoogleSheetsClient:
             else:
                 creds = self._run_oauth_flow()
             
-            # Save credentials for future use
-            if creds:
+            # Save credentials locally for future use
+            if creds and not env_creds:
                 TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
                 with open(TOKEN_FILE, 'w') as f:
                     f.write(creds.to_json())
         
         if creds:
             self.client = gspread.authorize(creds)
-            logger.info("✓ Authenticated with Google Sheets")
+            logger.info("✓ Final Authentication Successful")
         else:
             raise Exception("Failed to authenticate with Google")
     
