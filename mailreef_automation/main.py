@@ -5,7 +5,12 @@ Run this to start the automation
 
 import logging
 import time
+import sys
 import os
+
+# Add project root to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import config
 from mailreef_client import MailreefClient
 from scheduler import EmailScheduler

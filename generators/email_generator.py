@@ -19,8 +19,9 @@ sys.path.append(str(BASE_DIR))
 # Try to import the scraper, fallback if missing
 try:
     from scrapers.school_scraper import scrape_website_text
-except ImportError:
-    logging.warning("⚠️ Could not import school_scraper. Live scraping will be disabled.")
+except ImportError as e:
+    logging.warning(f"⚠️ Could not import school_scraper: {e}")
+    logging.warning(f"🔍 sys.path: {sys.path}")
     scrape_website_text = None
 
 from logger_util import get_logger
