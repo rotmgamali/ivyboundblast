@@ -18,11 +18,19 @@ sys.path.append(str(BASE_DIR))
 
 # Try to import the scraper, fallback if missing
 try:
-    from scrapers.school_scraper import scrape_website_text
+    # First attempt: Root-relative import (Standard for our Docker setup)
+    import scrapers.school_scraper as school_scraper
+    scrape_website_text = school_scraper.scrape_website_text
+    logger.info("✓ Successfully imported school_scraper")
 except ImportError as e:
-    logging.warning(f"⚠️ Could not import school_scraper: {e}")
-    logging.warning(f"🔍 sys.path: {sys.path}")
-    scrape_website_text = None
+    try:
+        # Second attempt: Direct import (if path already adjusted)
+        from scrapers.school_scraper import scrape_website_text
+        logger.info("✓ Successfully imported school_scraper via fallback")
+    except ImportError:
+        logging.warning(f"⚠️ Could not import school_scraper: {e}")
+        logging.warning(f"🔍 sys.path currently includes: {sys.path[:3]}...")
+        scrape_website_text = None
 
 from logger_util import get_logger
 
