@@ -88,9 +88,11 @@ class GoogleSheetsClient:
             worksheet = self.input_sheet.sheet1
             self._all_records_cache = worksheet.get_all_records()
             self._last_all_records_fetch = now
-            # Warm up individual cache
-            for record in self._all_records_cache:
+            # Warm up individual cache with row numbers
+            # index i in get_all_records corresponds to row i + 2 (1-based headers)
+            for i, record in enumerate(self._all_records_cache):
                 if record.get('email'):
+                    record['_row'] = i + 2
                     self._cache[record['email']] = record
         return self._all_records_cache
     
@@ -298,14 +300,19 @@ class GoogleSheetsClient:
         
         # Find the row with this email
         try:
-            # Check cache for row if possible or search
-            # gspread's find() is an API call, let's try to optimize if we can
-            # But search is safer for status consistency
-            cell = worksheet.find(email)
-            row = cell.row
+            # Check cache for row if possible
+            cached_record = self._cache.get(email)
+            if cached_record and cached_record.get('_row'):
+                row = cached_record['_row']
+            else:
+                # Fallback to search if not in cache (should be rare)
+                cell = worksheet.find(email)
+                row = cell.row
             
-            # Get column indices (1-indexed)
-            headers = worksheet.row_values(1)
+            # Get column indices (Use a small cache for headers too)
+            if not hasattr(self, '_headers_cache') or not self._headers_cache:
+                self._headers_cache = worksheet.row_values(1)
+            headers = self._headers_cache
             
             # Prepare batch updates
             cell_list = []
