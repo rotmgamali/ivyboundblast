@@ -9,9 +9,12 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Dict, Optional
-from logger_util import get_logger
 import os
 import socket
+import base64
+import socks
+
+from logger_util import get_logger
 
 # Check for SOCKS Proxy to bypass cloud firewalls
 SOCKS_PROXY = os.getenv("SOCKS_PROXY_URL")  # Format: socks5://user:pass@host:port
@@ -50,29 +53,84 @@ def get_proxy_config():
         print(f"⚠️ Failed to parse SOCKS_PROXY_URL: {e}")
         return None
 
+def create_proxy_connection(target, timeout, proxy_info):
+    """
+    Creates a connection through a proxy.
+    Uses socks.create_connection for SOCKS5, 
+    but uses a manual HTTP/1.1 CONNECT for HTTP to bypass 407 errors.
+    """
+    target_host, target_port = target
+    
+    if proxy_info['proxy_type'] != socks.HTTP:
+        # Standard SOCKS5 handling
+        return socks.create_connection(
+            target,
+            timeout=timeout,
+            **proxy_info
+        )
+    
+    # Custom HTTP CONNECT for modern proxy compliance (fixes 407)
+    proxy_addr = proxy_info['proxy_addr']
+    proxy_port = proxy_info['proxy_port']
+    user = proxy_info['proxy_username']
+    password = proxy_info['proxy_password']
+    
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.settimeout(timeout)
+        s.connect((proxy_addr, proxy_port))
+        
+        auth = base64.b64encode(f"{user}:{password}".encode()).decode()
+        connect_req = (
+            f"CONNECT {target_host}:{target_port} HTTP/1.1\r\n"
+            f"Host: {target_host}:{target_port}\r\n"
+            f"Proxy-Authorization: Basic {auth}\r\n"
+            f"User-Agent: MailreefAutomation/1.0\r\n"
+            f"Proxy-Connection: Keep-Alive\r\n\r\n"
+        )
+        s.sendall(connect_req.encode())
+        
+        # Read response
+        response = s.recv(4096).decode()
+        if "200" in response or "Established" in response:
+            return s
+        else:
+            first_line = response.splitlines()[0] if response else "Empty Proxy Response"
+            s.close()
+            raise socket.error(f"Proxy connection failed: {first_line}")
+    except Exception as e:
+        s.close()
+        raise e
+
 class ProxySMTP(smtplib.SMTP):
-    """SMTP class that routes traffic through a SOCKS proxy."""
+    """SMTP class that routes traffic through a SOCKS or HTTP proxy."""
     def __init__(self, *args, **kwargs):
         self.proxy_info = get_proxy_config()
         super().__init__(*args, **kwargs)
 
     def _get_socket(self, host, port, timeout):
         if self.proxy_info:
-            import socks
-            return socks.create_connection(
+            return create_proxy_connection(
                 (host, port), 
                 timeout=timeout,
-                **self.proxy_info
+                proxy_info=self.proxy_info
             )
         return super()._get_socket(host, port, timeout)
 
 class ProxySMTP_SSL(smtplib.SMTP_SSL):
-    """SMTP_SSL class that routes traffic through a SOCKS proxy."""
+    """SMTP_SSL class that routes traffic through a SOCKS or HTTP proxy."""
     def __init__(self, *args, **kwargs):
         self.proxy_info = get_proxy_config()
         super().__init__(*args, **kwargs)
 
     def _get_socket(self, host, port, timeout):
+        if self.proxy_info:
+            return create_proxy_connection(
+                (host, port), 
+                timeout=timeout,
+                proxy_info=self.proxy_info
+            )
+        return super()._get_socket(host, port, timeout)
         if self.proxy_info:
             import socks
             return socks.create_connection(
