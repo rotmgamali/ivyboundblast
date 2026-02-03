@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.join(BASE_DIR, "mailreef_automation"))
 sys.path.insert(0, BASE_DIR)
 
 from mailreef_automation.mailreef_client import MailreefClient
-from mailreef_automation.contact_manager import ContactManager
 from mailreef_automation.telegram_alert import TelegramNotifier
 from sheets_integration import GoogleSheetsClient
 from generators.email_generator import EmailGenerator
@@ -43,7 +42,6 @@ class ReplyWatcher:
         
         self.state_file = STATE_FILE
         self.mailreef = MailreefClient(api_key=MAILREEF_API_KEY)
-        self.contact_manager = ContactManager(database_path=os.path.join(BASE_DIR, "mailreef_automation/campaign.db"))
         self.sheets_client = GoogleSheetsClient()
         self.telegram = TelegramNotifier()
         self.generator = EmailGenerator() # Used for sentiment analysis
@@ -126,8 +124,9 @@ Return ONLY one word: positive, negative, or neutral."""
             body = reply.get('body', '')
             subject = reply.get('subject', '')
             
-            # 1. Update SQLite (Auto-cancel future follow-ups)
-            self.contact_manager.update_contact_status(from_email, 'replied')
+            # 1. Update Sheets (Auto-cancel future follow-ups)
+            # This is handled inside sheets_client.log_reply which calls update_lead_status(email, 'replied')
+            logger.info(f"📩 Processing reply from {from_email}...")
             
             # 2. Sentiment Analysis
             sentiment = self.analyze_sentiment(body)

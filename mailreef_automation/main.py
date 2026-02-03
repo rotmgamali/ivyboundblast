@@ -124,20 +124,31 @@ def main():
         logger.info("Starting deliverability monitoring...")
         monitor.start()
         
+        # Start Reply Watcher (Background Thread)
+        logger.info("Starting reply watcher...")
+        from reply_watcher import ReplyWatcher
+        watcher = ReplyWatcher()
+        import threading
+        watcher_thread = threading.Thread(target=watcher.run_daemon, daemon=True)
+        watcher_thread.start()
+        
         logger.info("Email automation system is now running (Sheets-First Mode)")
-        # logger.info(f"Daily capacity: {contacts.calculate_daily_capacity()}")
         
         # Keep the main thread alive
         while True:
             time.sleep(1)
-            # input("Press Ctrl+C to stop...\n") 
-            # input() blocks in some environments, sleep loop is safer for daemon-like behavior
+            
     except KeyboardInterrupt:
         logger.info("Shutting down...")
+    except Exception as e:
+        logger.error(f"Critical System Error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
     finally:
         if 'scheduler' in locals(): scheduler.stop()
         if 'monitor' in locals(): monitor.stop()
         lock_util.release_lock('sender')
+        lock_util.release_lock('watcher')
 
 if __name__ == "__main__":
     main()
