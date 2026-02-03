@@ -310,11 +310,11 @@ class EmailScheduler:
         if not self.is_running:
             self.scheduler.start()
             self.is_running = True
-            print("Scheduler started")
+            logger.info("🚀 Email Scheduler Started (EST Timezone)")
             self._schedule_daily_runs()
             
             # Run immediate prep for first launch
-            print("Triggering immediate queue preparation...")
+            logger.info("📡 Triggering immediate queue preparation...")
             self._prepare_daily_queue()
     
     def stop(self):
@@ -361,6 +361,9 @@ class EmailScheduler:
                 id=f'slot_{slot["inbox_id"]}_{slot["scheduled_time"].strftime("%Y%m%d%H%M%S")}_{random.randint(1000,9999)}',
                 misfire_grace_time=3600 # Allow catchup if system was briefly down
             )
+        
+        # Log upcoming sends for peace of mind
+        self.log_upcoming_sends(limit=5)
     
     def _execute_slot(self, inbox_id, scheduled_time):
         """Execute a single send slot with sequence prioritization"""
@@ -379,3 +382,22 @@ class EmailScheduler:
         else:
              # logger.debug(f"🔇 [SLOT FIRE] No prospects (Stage 1 or 2) found for inbox {inbox_id} at {scheduled_time}")
              pass
+
+    def log_upcoming_sends(self, limit=5):
+        """Prints the next N scheduled sends to the log for visibility."""
+        jobs = self.scheduler.get_jobs()
+        # Filter for slot jobs and sort by next_run_time
+        slot_jobs = [j for j in jobs if j.id.startswith('slot_')]
+        slot_jobs.sort(key=lambda x: x.next_run_time)
+        
+        if not slot_jobs:
+            logger.info("📅 No upcoming send slots found in queue.")
+            return
+
+        logger.info(f"📅 UPCOMING SENDS (Next {min(len(slot_jobs), limit)}):")
+        for i, job in enumerate(slot_jobs[:limit]):
+            run_time = job.next_run_time.strftime("%I:%M:%S %p %Z")
+            # Extract inbox from ID (format: slot_EMAIL_TIMESTAMP_RANDOM)
+            parts = job.id.split('_')
+            inbox = parts[1] if len(parts) > 1 else "unknown"
+            logger.info(f"   {i+1}. 🕒 {run_time} -> {inbox}")
