@@ -18,18 +18,26 @@ def ensure_singleton(process_name: str):
     if os.path.isfile(pid_file):
         try:
             with open(pid_file, 'r') as f:
-                old_pid = int(f.read().strip())
+                old_pid_text = f.read().strip()
+                if not old_pid_text:
+                    raise ValueError("Empty PID file")
+                old_pid = int(old_pid_text)
                 
             # Check if process with old_pid is actually running
-            os.kill(old_pid, 0)
-            
-            # If no error, process is running
-            print(f"❌ CRITICAL ERROR: Another instance of {process_name} is already running (PID: {old_pid}).")
-            print(f"If you are sure it's not running, delete {pid_file} and try again.")
-            logger.critical(f"Aborting start: {process_name} already running with PID {old_pid}")
-            sys.exit(1)
-        except (OSError, ValueError, ProcessLookupError):
-            # Process is not running, we can take over the lock
+            # In Docker, PID 1 is common, so if current PID matches old PID, 
+            # we assume it's a stale lock from a previous container and proceed.
+            if old_pid != os.getpid():
+                os.kill(old_pid, 0)
+                
+                # If no error, process is running
+                print(f"❌ CRITICAL ERROR: Another instance of {process_name} is already running (PID: {old_pid}).")
+                print(f"If you are sure it's not running, delete {pid_file} and try again.")
+                logger.critical(f"Aborting start: {process_name} already running with PID {old_pid}")
+                sys.exit(1)
+            else:
+                logger.debug(f"ℹ️ PID in lock matches current PID ({old_pid}). Overwriting stale lock.")
+        except (OSError, ValueError, ProcessLookupError, UnboundLocalError):
+            # Process is not running or PID file is invalid/corrupt
             pass
 
     # Write current PID to lock file
