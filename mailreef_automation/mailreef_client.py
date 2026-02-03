@@ -10,6 +10,33 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Dict, Optional
 from logger_util import get_logger
+import os
+import socket
+
+# Check for SOCKS Proxy to bypass cloud firewalls
+SOCKS_PROXY = os.getenv("SOCKS_PROXY_URL")  # Format: socks5://user:pass@host:port
+if SOCKS_PROXY:
+    try:
+        import socks
+        from urllib.parse import urlparse
+        
+        proxy_parts = urlparse(SOCKS_PROXY)
+        proxy_type = socks.SOCKS5 if 'socks5' in proxy_parts.scheme else socks.HTTP
+        
+        # Extract credentials and host
+        username = proxy_parts.username
+        password = proxy_parts.password
+        host = proxy_parts.hostname
+        port = proxy_parts.port or 1080
+        
+        # Patch the socket to route all traffic via proxy
+        socks.set_default_proxy(proxy_type, host, port, True, username, password)
+        socket.socket = socks.socksocket
+        print(f"🔒 Tunneling via SOCKS Proxy: {host}:{port}")
+    except ImportError:
+        print("⚠️ SOCKS_PROXY_URL set but PySocks not installed. Install it via pip.")
+    except Exception as e:
+        print(f"❌ Failed to configure SOCKS proxy: {e}")
 
 logger = get_logger("MAILREEF_CLIENT")
 
