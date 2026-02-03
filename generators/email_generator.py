@@ -65,7 +65,8 @@ class EmailGenerator:
         campaign_type: str,
         sequence_number: int,
         lead_data: dict,
-        enrichment_data: dict
+        enrichment_data: dict,
+        sender_email: str = None
     ) -> dict:
         """
         Routing method:
@@ -73,11 +74,11 @@ class EmailGenerator:
         - Otherwise, use legacy dictionary prompts.
         """
         if campaign_type == "school":
-            return self._generate_school_email(sequence_number, lead_data, enrichment_data)
+            return self._generate_school_email(sequence_number, lead_data, enrichment_data, sender_email)
         else:
             return self._generate_legacy_email(campaign_type, sequence_number, lead_data, enrichment_data)
 
-    def _generate_school_email(self, sequence_number: int, lead_data: dict, enrichment_data: dict) -> dict:
+    def _generate_school_email(self, sequence_number: int, lead_data: dict, enrichment_data: dict, sender_email: str = None) -> dict:
         """
         1. Identify Archetype (Role).
         2. Load Template (file).
@@ -121,7 +122,7 @@ class EmailGenerator:
             logger.warning(f"⚠️ [SCRAPE SKIP] No 'domain' or 'website' found in lead data for {lead_data.get('email')}.")
         
         # Build Prompt
-        prompt = self._get_school_prompt(template_content, lead_data, website_content, sequence_number)
+        prompt = self._get_school_prompt(template_content, lead_data, website_content, sequence_number, sender_email)
         
         return self._call_llm(prompt)
 
@@ -195,7 +196,7 @@ class EmailGenerator:
             
         return None
 
-    def _get_school_prompt(self, template_content: str, lead_data: dict, website_content: str, sequence_number: int = 1) -> str:
+    def _get_school_prompt(self, template_content: str, lead_data: dict, website_content: str, sequence_number: int = 1, sender_email: str = None) -> str:
         """Construct the LLM prompt for school emails with human-first personalization."""
         
         # Intelligent Name Sanitization
@@ -248,14 +249,24 @@ class EmailGenerator:
             greeting_line = f"Hi {first_name},"
             template_instruction = ""
             
-        # Determine sender based on archetype/strategy
-        
-        # Determine sender based on archetype/strategy
-        sender_name = "Andrew"
-        if any(keyword in str(role).lower() for keyword in ["head of school", "headmaster", "president", "superintendent", "business", "finance", "cfo"]):
-            sender_name = "Mark Greenstein"
-        elif any(keyword in str(role).lower() for keyword in ["dean", "academic", "curriculum", "instruction"]):
-            sender_name = "Genelle"
+        # Determine sender based on INBOX EMAIL (Identity Source of Truth)
+        sender_name = "Andrew" # Default fallback
+        if sender_email:
+            email_lower = sender_email.lower()
+            if "mark" in email_lower:
+                sender_name = "Mark Greenstein"
+            elif "genelle" in email_lower:
+                sender_name = "Genelle"
+            elif "andrew" in email_lower:
+                sender_name = "Andrew"
+            elif "outreach" in email_lower:
+                sender_name = "Andrew"
+        else:
+            # Legacy Fallback: Role-based (Only used if no sender_email provided)
+            if any(keyword in str(role).lower() for keyword in ["head of school", "headmaster", "president", "superintendent", "business", "finance", "cfo"]):
+                sender_name = "Mark Greenstein"
+            elif any(keyword in str(role).lower() for keyword in ["dean", "academic", "curriculum", "instruction"]):
+                sender_name = "Genelle"
             
         # Determine email purpose based on sequence
         if sequence_number == 1:

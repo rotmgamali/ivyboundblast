@@ -244,15 +244,26 @@ class EmailScheduler:
         results = []
         for prospect in prospects:
             try:
+                # Resolve sender email for dynamic sign-off
+                sender_email = "unknown"
+                try:
+                    inboxes = self.mailreef.get_inboxes()
+                    for ibx in inboxes:
+                        if str(ibx['id']) == str(inbox_id):
+                            sender_email = ibx['email'] or ibx.get('address', 'unknown')
+                            break
+                except: pass
+
                 # Use High-Fidelity Generator
-                logger.info(f"🚀 [SEND START] Generating personalized email for {prospect.get('email')}...")
+                logger.info(f"🚀 [SEND START] Generating personalized email for {prospect.get('email')} using sender {sender_email}...")
                 
                 # Note: Sheets Row provides 'school_name', 'domain', 'first_name', 'role', etc.
                 result = self.generator.generate_email(
                     campaign_type="school",
                     sequence_number=sequence_number,
                     lead_data=dict(prospect),
-                    enrichment_data={} # Scrapes live
+                    enrichment_data={}, # Scrapes live
+                    sender_email=sender_email
                 )
                 
                 subject = result['subject']
@@ -279,15 +290,7 @@ class EmailScheduler:
                 # Mailreef API response might contain 'from'? Probably not.
                 # Let's resolve specific sender email again or assume rotation logic valid.
                 
-                # Fetch sender email just for logging (could optimize this out)
-                sender_email = "unknown"
-                try:
-                    inboxes = self.mailreef.get_inboxes()
-                    for ibx in inboxes:
-                        if str(ibx['id']) == str(inbox_id):
-                            sender_email = ibx['email']
-                            break
-                except: pass
+                # Match logic moved up (sender_email already resolved)
 
                 status = f"email_{sequence_number}_sent"
                 self.sheets.update_lead_status(
