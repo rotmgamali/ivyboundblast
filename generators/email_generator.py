@@ -121,10 +121,12 @@ class EmailGenerator:
         elif not url:
             logger.warning(f"⚠️ [SCRAPE SKIP] No 'domain' or 'website' found in lead data for {lead_data.get('email')}.")
         
-        # Build Prompt
-        prompt = self._get_school_prompt(template_content, lead_data, website_content, sequence_number, sender_email)
+        # Build Prompts (System + User)
+        system_prompt, user_prompt = self._prepare_school_prompts(
+            template_content, lead_data, website_content, sequence_number, sender_email
+        )
         
-        return self._call_llm(prompt)
+        return self._call_llm(user_prompt, system_prompt)
 
     def _get_archetype(self, role: str) -> str:
         """Map job title to archetype folder name."""
@@ -196,134 +198,88 @@ class EmailGenerator:
             
         return None
 
-    def _get_school_prompt(self, template_content: str, lead_data: dict, website_content: str, sequence_number: int = 1, sender_email: str = None) -> str:
-        """Construct the LLM prompt for school emails with human-first personalization."""
+    def _prepare_school_prompts(self, template_content: str, lead_data: dict, website_content: str, sequence_number: int, sender_email: str) -> tuple:
+        """
+        Constructs (system_message, user_message) for the LLM.
+        Performs Python-side string substitution to guarantee greeting correctness.
+        """
         
-        # Intelligent Name Sanitization
+        # --- 1. Calculate Variables (Identity & Recipient) ---
+        
+        # Name & Greeting Logic
         raw_name = lead_data.get("first_name", "")
+        sanitized = self._sanitize_name(raw_name, lead_data)
+        
+        if sanitized:
+            first_name = sanitized
+            # Religious Titles
+            role = lead_data.get("role", "").lower()
+            religious_titles = {"pastor": "Pastor", "reverend": "Reverend", "rev.": "Reverend", "father": "Father", "rabbi": "Rabbi"}
+            for keyword, title in religious_titles.items():
+                if keyword in role and title.lower() not in first_name.lower():
+                    first_name = f"{title} {first_name}"
+                    break
+            greeting_line = f"Hi {first_name},"
+        else:
+            # Fallback to Time-Based
+            greeting_line = f"{self._get_time_greeting()},"
+            first_name = "School Leader" # Default for prompt context
+            
+        # Sender Logic
+        sender_name = "Andrew"
+        if sender_email:
+            if "mark" in sender_email.lower(): sender_name = "Mark Greenstein"
+            elif "genelle" in sender_email.lower(): sender_name = "Genelle"
+        
+        # --- 2. Python-Side Template Substitution (The Fix) ---
+        # We replace the greeting placeholder in the code, so the LLM just sees text.
+        # Handle variations of the tag
+        draft_body = template_content
+        for tag in ["Hi {{first_name}}", "Hi {{first_name}},", "{{first_name}}"]:
+             draft_body = draft_body.replace(tag, greeting_line)
+             
+        # Double check: ensure the greeting is at the top if replacement failed (e.g. template diff)
+        # But for now, assume template compliance. 
+        
+        # School/Location Context
         school_name = lead_data.get("school_name", "your school")
         city = lead_data.get("city", "")
         state = lead_data.get("state", "")
-        role = lead_data.get("role", "")
-        subtypes = lead_data.get("subtypes", "")
-        description = lead_data.get("description", "")
+        location_txt = f"{city}, {state}" if city and state else ""
         
-        sanitized = self._sanitize_name(raw_name, lead_data)
+        # --- 3. System Prompt (Identity & Behavior) ---
+        system_prompt = f"""You are {sender_name}, a helpful consultant for private schools.
         
-        # Fallback Logic
-        if sanitized:
-            first_name = sanitized
-            
-            # Religious Title Logic: Check if we should add a title
-            # Keywords to check in ROLE
-            religious_titles = {
-                "pastor": "Pastor",
-                "reverend": "Reverend", 
-                "rev.": "Reverend",
-                "father": "Father",
-                "fr.": "Father",
-                "rabbi": "Rabbi",
-                "sister": "Sister",
-                "brother": "Brother"
-            }
-            role_lower = str(role).lower()
-            
-            for keyword, title in religious_titles.items():
-                if keyword in role_lower:
-                    # Avoid double titling if name already has it (e.g. "Pastor Andrew")
-                    if title.lower() not in first_name.lower():
-                        first_name = f"{title} {first_name}"
-                    break
-        else:
-            # STRICT FALLBACK RULE:
-            # If no valid name, ALWAYS use Time-Based Greeting.
-            # No "Admissions Team", No "Hi Team".
-            first_name = self._get_time_greeting()
-        
-        # Determine Greeting vs Name
-        # If we have a time greeting (starts with Good), use it directly.
-        if first_name.startswith("Good "):
-            greeting_line = f"{first_name},"
-            # Simplified: Let the template replacement handle it.
-            # Removing the "IMPORTANT: Start with..." line prevents the double greeting.
-            template_instruction = ""
-        else:
-            greeting_line = f"Hi {first_name},"
-            template_instruction = ""
-            
-        # Determine sender based on INBOX EMAIL (Identity Source of Truth)
-        sender_name = "Andrew" # Default fallback
-        if sender_email:
-            email_lower = sender_email.lower()
-            if "mark" in email_lower:
-                sender_name = "Mark Greenstein"
-            elif "genelle" in email_lower:
-                sender_name = "Genelle"
-            elif "andrew" in email_lower:
-                sender_name = "Andrew"
-            elif "outreach" in email_lower:
-                sender_name = "Andrew"
-        else:
-            # Legacy Fallback: Role-based (Only used if no sender_email provided)
-            if any(keyword in str(role).lower() for keyword in ["head of school", "headmaster", "president", "superintendent", "business", "finance", "cfo"]):
-                sender_name = "Mark Greenstein"
-            elif any(keyword in str(role).lower() for keyword in ["dean", "academic", "curriculum", "instruction"]):
-                sender_name = "Genelle"
-            
-        # Determine email purpose based on sequence
-        if sequence_number == 1:
-            email_purpose = "WARM INTRODUCTION: Build curiosity. Show you did your research on their school and city. No hard sell."
-        else:
-            email_purpose = "VALUE FOLLOW-UP: Build on the previous intro. Use specific stats and a soft call to action."
-        
-        # Build location context
-        location_context = ""
-        if city and state:
-            location_context = f"The school is in {city}, {state}. Weave this in naturally (e.g., 'I know schools in the {city} area are busy...')."
-            
-        return f"""You are {sender_name}, writing a personalized email to {first_name} ({role}) at {school_name}.
-
-GOAL: {email_purpose}
-
-TEMPLATE (Use the flow and core message, but make the wording feel human and natural):
----
-{template_content}
----
-
-INSTRUCTION: {template_instruction}
-INSTRUCTION: {template_instruction}
-If the template says "Hi {{first_name}}", replace that EXACT string with "{greeting_line}". Do NOT add an extra greeting at the start.
-
-VERIFIED DATA (ONLY use these facts):
-- Recipient: {first_name}
-- School: {school_name}
-- Role: {role}
-- Location: {city}, {state}
-- Info: {subtypes} | {description[:300] if description else "N/A"}
----
-
-SCRAPED WEBSITE CONTENT (FIND 1-2 SPECIFIC DETAILS TO HOOK INTO):
----
-{website_content[:4000] if website_content else "No website content available."}
----
-
-STRICT PERSONALIZATION RULES:
-1. **The 'Five-Minute Rule'**: Write this as if you actually spent 5 minutes on their website. 
-2. **The Hook**: Find a SPECIFIC program, achievement, or mission phrase from the SCRAPED CONTENT. Weave it into the first paragraph naturally. (e.g., "I saw your focus on global citizenship..." or "I noticed your recent success in...").
-3. **Location Context**: Mention their city/state ({{city}}) naturally and warmly.
-4. **Role Mindset**:
-   - Pastoral → mission, community, student growth.
-   - Head/Principal → parent satisfaction, outcomes, tuition value.
-   - Athletics → student-athlete balance, scholarships.
-   - Admissions → enrollment value, recruitment advantage.
-5. **No Hallucination**: NEVER invent a fact. If the scrape is empty, don't fake a detail.
-6. **Tone**: Human-first. Brief. No "corporate speak." No "I am writing to..." 
-7. **Sign off**: Match the sender name {sender_name}.
-
-OUTPUT FORMAT:
-SUBJECT: [A subject line that gets opened]
-BODY: [The email body]
+STYLE GUIDE:
+- Tone: Human, warm, brief. No "marketing" fluff. Lowercase aesthetic preferred.
+- formatting: Standard email. No markdown headers (like **Subject**).
+- Absolute Rules:
+  1. NEVER invent facts. If research is missing, be generic but warm.
+  2. DO NOT change the starting greeting sent in the draft.
+  3. DO NOT add a second greeting (e.g. "Good morning... Good morning").
 """
+
+        # --- 4. User Prompt (The Task) ---
+        user_prompt = f"""Here is a DRAFT email I want to send to {first_name} ({lead_data.get('role')}) at {school_name}.
+
+DRAFT EMAIL:
+'''
+{draft_body}
+'''
+
+RESEARCH HIGHLIGHTS:
+{website_content[:3000]}
+
+TASK:
+Rewrite the draft to make it feel personal.
+- If possible, gently weave in 1 specific detail from the RESEARCH HIGHLIGHTS (a program, mission, or city reference).
+- Keep the greeting "{greeting_line}" EXACTLY as is.
+- Sign off as {sender_name}.
+- Output in this format:
+SUBJECT: [Subject]
+BODY: [Body]
+"""
+        return system_prompt, user_prompt
 
     def _generate_legacy_email(self, campaign_type: str, sequence_number: int, lead_data: dict, enrichment_data: dict) -> dict:
         """Fallback for non-school campaigns."""
@@ -352,11 +308,16 @@ BODY: [The email body]
         
         return result
 
-    def _call_llm(self, prompt: str) -> dict:
+    def _call_llm(self, prompt: str, system_prompt: str = None) -> dict:
         try:
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 temperature=0.7
             )
             return self._parse_response(response.choices[0].message.content)
