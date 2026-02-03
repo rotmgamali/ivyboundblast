@@ -45,17 +45,28 @@ def run_diagnostics():
         try:
             import socks
             from urllib.parse import urlparse
-            proxy_parts = urlparse(SOCKS_PROXY)
+            
+            # Use same logic as mailreef_client
+            if '://' not in SOCKS_PROXY:
+                url = f"http://{SOCKS_PROXY}"
+            else:
+                url = SOCKS_PROXY
+                
+            proxy_parts = urlparse(url)
+            is_socks = 'socks' in proxy_parts.scheme
+            
             proxy_info = {
-                'proxy_type': socks.SOCKS5 if 'socks5' in proxy_parts.scheme else socks.HTTP,
+                'proxy_type': socks.SOCKS5 if is_socks else socks.HTTP,
                 'proxy_addr': proxy_parts.hostname,
-                'proxy_port': proxy_parts.port or 1080,
+                'proxy_port': proxy_parts.port or (1080 if is_socks else 80),
                 'proxy_rdns': True,
                 'proxy_username': proxy_parts.username,
                 'proxy_password': proxy_parts.password
             }
-        except Exception:
-            pass
+            type_str = "SOCKS5" if is_socks else "HTTP"
+            print(f"🔒 Proxy detected: [{type_str}] {proxy_info['proxy_addr']}:{proxy_info['proxy_port']}")
+        except Exception as e:
+            print(f"⚠️ Proxy parse error: {e}")
 
     # 1. Environment Check
     try:
@@ -65,6 +76,21 @@ def run_diagnostics():
         print(f"📍 Container IP: {local_ip}")
     except Exception as e:
         print(f"⚠️ Could not get local env details: {e}")
+
+    # 1.5 Requests Test (The most reliable check)
+    if SOCKS_PROXY:
+        print("\n🔍 Web Check via Proxy:")
+        try:
+            import requests
+            proxies = {'http': SOCKS_PROXY, 'https': SOCKS_PROXY}
+            # Use a longer timeout for the web check
+            r = requests.get("https://api.ipify.org", proxies=proxies, timeout=15)
+            print(f"   ✅ WEB PROXY SUCCESS: {r.text}")
+        except Exception as e:
+            # Mask the URL in the error if it contains password
+            err_msg = str(e).replace(SOCKS_PROXY, "[REDACTED]")
+            print(f"   ❌ WEB PROXY FAILURE: {err_msg}")
+
 
     # 2. DNS Resolution
     print(f"\n🔍 DNS Resolution: {target_host}")
@@ -85,6 +111,11 @@ def run_diagnostics():
     
     if proxy_info:
         print("\nVia Proxy (Must succeed for sending):")
+        # Control Test: Port 443 (Should always work if proxy is OK)
+        print("--- Control Test (HTTPS) ---")
+        check_connection("google.com", 443, proxy_info=proxy_info)
+        
+        print("\n--- SMTP Tests ---")
         check_connection(target_host, 465, proxy_info=proxy_info)
         check_connection(target_host, 587, proxy_info=proxy_info)
     else:

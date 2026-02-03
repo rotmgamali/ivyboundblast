@@ -22,16 +22,27 @@ def get_proxy_config():
     try:
         import socks
         from urllib.parse import urlparse
-        proxy_parts = urlparse(SOCKS_PROXY)
+        
+        # Handle cases where user forgot the scheme (default to http)
+        if '://' not in SOCKS_PROXY:
+            url = f"http://{SOCKS_PROXY}"
+        else:
+            url = SOCKS_PROXY
+            
+        proxy_parts = urlparse(url)
+        is_socks = 'socks' in proxy_parts.scheme
+        
         config = {
-            'proxy_type': socks.SOCKS5 if 'socks5' in proxy_parts.scheme else socks.HTTP,
+            'proxy_type': socks.SOCKS5 if is_socks else socks.HTTP,
             'proxy_addr': proxy_parts.hostname,
-            'proxy_port': proxy_parts.port or 1080,
+            'proxy_port': proxy_parts.port or (1080 if is_socks else 80),
             'proxy_rdns': True,
             'proxy_username': proxy_parts.username,
             'proxy_password': proxy_parts.password
         }
-        print(f"🔒 Targeted Proxy configured: {config['proxy_addr']}:{config['proxy_port']}")
+        
+        type_str = "SOCKS5" if is_socks else "HTTP"
+        print(f"🔒 Targeted Proxy configured: [{type_str}] {config['proxy_addr']}:{config['proxy_port']}")
         return config
     except Exception as e:
         print(f"⚠️ Failed to parse SOCKS_PROXY_URL: {e}")
