@@ -131,14 +131,6 @@ class ProxySMTP_SSL(smtplib.SMTP_SSL):
                 proxy_info=self.proxy_info
             )
         return super()._get_socket(host, port, timeout)
-        if self.proxy_info:
-            import socks
-            return socks.create_connection(
-                (host, port), 
-                timeout=timeout,
-                **self.proxy_info
-            )
-        return super()._get_socket(host, port, timeout)
 
 logger = get_logger("MAILREEF_CLIENT")
 
