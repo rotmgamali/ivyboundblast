@@ -109,6 +109,14 @@ def run_diagnostics():
     except Exception as e:
         print(f"⚠️ Could not get local env details: {e}")
 
+    # 1.2 Direct External IP (For reference)
+    try:
+        import requests
+        r = requests.get("https://api.ipify.org", timeout=5)
+        print(f"📍 Container External IP: {r.text} (Note: This is DYNAMIC in Railway)")
+    except Exception as e:
+        print(f"⚠️ Could not get direct external IP: {e}")
+
     # 1.5 Requests Test (The most reliable check)
     if SOCKS_PROXY:
         print("\n🔍 Web Check via Proxy:")
