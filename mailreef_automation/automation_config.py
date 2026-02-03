@@ -19,8 +19,7 @@ INBOXES_PER_DAY_BUSINESS = 93  # 2 inboxes paused for precision
 INBOXES_PER_DAY_WEEKEND = 95   # All inboxes active on weekends
 INBOX_PAUSED_IDS = []          # Dynamic pause list for health monitoring
 
-EMAILS_PER_INBOX_DAY_BUSINESS = 21
-EMAILS_PER_INBOX_DAY_BUSINESS = 21
+EMAILS_PER_INBOX_DAY_BUSINESS = 25
 EMAILS_PER_INBOX_DAY_WEEKEND = 9
 
 # ==================== TELEGRAM ALERTS ====================
@@ -33,9 +32,9 @@ BUSINESS_DAY_WINDOWS = [
     {"start": 6, "end": 7, "emails_per_inbox": 2},
     {"start": 7, "end": 8, "emails_per_inbox": 2},
     {"start": 8, "end": 9, "emails_per_inbox": 3},
-    {"start": 9, "end": 10, "emails_per_inbox": 3},
+    {"start": 9, "end": 10, "emails_per_inbox": 4}, # Bumped to 4
     {"start": 10, "end": 11, "emails_per_inbox": 3},
-    {"start": 12, "end": 13, "emails_per_inbox": 3}, # Added for immediate live launch
+    {"start": 12, "end": 13, "emails_per_inbox": 3},
     {"start": 15, "end": 16, "emails_per_inbox": 2},
     {"start": 16, "end": 17, "emails_per_inbox": 2},
     {"start": 17, "end": 18, "emails_per_inbox": 2},

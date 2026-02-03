@@ -126,8 +126,8 @@ class EmailScheduler:
                         if jitter_minutes >= 60: # Wrap around if at end of hour
                             jitter_minutes = 59 
                     else:
-                        # Standard jitter: send 20-40 minutes into window base
-                        jitter_minutes = random.randint(20, 40)
+                        # Standard jitter: spread evenly across the hour
+                        jitter_minutes = random.randint(5, 55)
                     
                     send_time = now_est.replace(
                         hour=window_start,
