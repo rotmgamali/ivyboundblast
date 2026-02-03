@@ -56,6 +56,15 @@ def main():
         if not cfg.MAILREEF_API_KEY:
             logger.error("MAILREEF_API_KEY environment variable not set.")
             return
+
+        # 🔍 Run Network Diagnostics (Cloud Debugging)
+        try:
+            from diagnose_network import run_diagnostics
+            run_diagnostics()
+        except ImportError:
+            logger.warning("diagnose_network.py not found, skipping network check.")
+        except Exception as e:
+            logger.error(f"Error running diagnostics: {e}")
         
         mailreef = MailreefClient(
             api_key=cfg.MAILREEF_API_KEY,
