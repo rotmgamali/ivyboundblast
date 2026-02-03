@@ -86,6 +86,7 @@ class EmailGenerator:
         """
         role = (lead_data.get("role") or "").lower()
         archetype = self._get_archetype(role)
+        logger.info(f"🎯 [GEN] Archetype: {archetype} (detected from role: '{role}')")
         
         # Load Template
         template_content = self._load_template_file(archetype, sequence_number)
@@ -104,15 +105,20 @@ class EmailGenerator:
         url = lead_data.get("domain") or lead_data.get("website")
 
         if not website_content and url and scrape_website_text:
-            logger.info(f"🌍 Scraping {url} for personalization...")
+            logger.info(f"🌍 [SCRAPE] Attempting to scrape: {url}...")
             try:
                 if not url.startswith("http"):
                     url = "https://" + url
                 website_content = scrape_website_text(url)
-                logger.debug(f"🔍 Scrape summary for {url}: {len(website_content)} characters found.")
+                if website_content and len(website_content) > 100:
+                    logger.info(f"✅ [SCRAPE SUCCESS] Found {len(website_content)} characters for personalization.")
+                else:
+                    logger.warning(f"⚠️ [SCRAPE WEAK] Only found {len(website_content) if website_content else 0} chars. Personalization may be generic.")
             except Exception as e:
-                logger.error(f"❌ Scraping failed for {url}: {e}")
+                logger.error(f"❌ [SCRAPE ERROR] Failed for {url}: {e}")
                 website_content = "No website content available."
+        elif not url:
+            logger.warning(f"⚠️ [SCRAPE SKIP] No 'domain' or 'website' found in lead data for {lead_data.get('email')}.")
         
         # Build Prompt
         prompt = self._get_school_prompt(template_content, lead_data, website_content, sequence_number)
