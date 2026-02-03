@@ -37,7 +37,7 @@ warming/
 leads/
 scrapers/
 senders/
-templates/
+# templates/ (Removed from ignore to allow cloud deployment)
 Jobs/
 Jobs_Clone/
 playbook.pdf

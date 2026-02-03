@@ -178,6 +178,8 @@ class EmailGenerator:
         filename = f"email_{sequence_number}.txt"
         path = self.templates_dir / "school" / archetype / filename
         
+        logger.debug(f"🔍 [PATH CHECK] Looking for template at: {path}")
+        
         if path.exists():
             return path.read_text(encoding="utf-8")
         return None
