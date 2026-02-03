@@ -186,6 +186,15 @@ class MailreefClient:
                 
             except Exception as e2:
                 logger.error(f"❌ [SMTP FINAL ERROR] Failed on both ports ({primary_port}, {secondary_port}). Last error: {e2}")
+                
+                # 🔍 TRIGGER DIAGNOSTICS
+                try:
+                    logger.info("🩺 Triggering runtime network diagnostics...")
+                    from diagnose_network import run_diagnostics
+                    run_diagnostics()
+                except Exception as diag_err:
+                    logger.error(f"Failed to run diagnostics: {diag_err}")
+                
                 raise Exception(f"SMTP Failed: {e2}")
         
         except Exception as e:
