@@ -4,6 +4,7 @@ import sys
 
 def check_connection(host, port, timeout=10, proxy_info=None):
     """Try to open a TCP connection to host:port."""
+    import socket
     target_desc = f"{host}:{port}"
     if proxy_info:
         print(f"   Testing connectivity to {target_desc} via Proxy...", end='', flush=True)
@@ -19,7 +20,7 @@ def check_connection(host, port, timeout=10, proxy_info=None):
         sock.close()
         print(" ✅ SUCCESS")
         return True
-    except socket.timeout:
+    except (socket.timeout, TimeoutError):
         print(" ❌ TIMEOUT")
     except ConnectionRefusedError:
         print(" ❌ REFUSED")
