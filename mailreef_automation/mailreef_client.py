@@ -42,7 +42,9 @@ def get_proxy_config():
         }
         
         type_str = "SOCKS5" if is_socks else "HTTP"
-        print(f"🔒 Targeted Proxy configured: [{type_str}] {config['proxy_addr']}:{config['proxy_port']}")
+        # MASKED LOG to reveal the exact scheme being seen by the app
+        masked_url = f"{proxy_parts.scheme}://{proxy_parts.hostname}:{proxy_parts.port}"
+        print(f"🔒 Targeted Proxy configured: [{type_str}] (Parsed from: {masked_url})")
         return config
     except Exception as e:
         print(f"⚠️ Failed to parse SOCKS_PROXY_URL: {e}")
@@ -268,6 +270,14 @@ class MailreefClient:
         
         except Exception as e:
             logger.error(f"❌ [SMTP ERROR] Unexpected error via {smtp_host}: {e}")
+            
+            # 🔍 TRIGGER DIAGNOSTICS on unexpected errors too
+            try:
+                from diagnose_network import run_diagnostics
+                run_diagnostics()
+            except:
+                pass
+                
             raise Exception(f"SMTP Send Error: {e}")
 
     def _get_cached_creds(self, inbox_id: str) -> Dict:
