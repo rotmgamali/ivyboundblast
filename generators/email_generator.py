@@ -11,6 +11,7 @@ import pytz
 
 # Suppress SSL warnings from scraper to keep logs clean
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import re
 
 # Add project root to path to allow imports from sibling directories
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -231,12 +232,50 @@ class EmailGenerator:
             if "mark" in sender_email.lower(): sender_name = "Mark Greenstein"
             elif "genelle" in sender_email.lower(): sender_name = "Genelle"
         
+        
         # --- 2. Python-Side Template Substitution (The Fix) ---
-        # We replace the greeting placeholder in the code, so the LLM just sees text.
-        # Handle variations of the tag
+        # Regex replacement for robust handling of {{name}} vs {{ name }}
+        # 1. Replace Greeting
+        # We want to replace the entire "Hi {{ first_name }}," block matches if possible, 
+        # or just the variable.
+        
         draft_body = template_content
-        for tag in ["Hi {{first_name}}", "Hi {{first_name}},", "{{first_name}}"]:
-             draft_body = draft_body.replace(tag, greeting_line)
+        
+        # Strategy: Pre-fill ALL known variables in the template so the LLM sees clean text.
+        replacements = {
+            "first_name": first_name,
+            "school_name": lead_data.get("school_name", "your school"),
+            "city": lead_data.get("city", "your city"),
+            "state": lead_data.get("state", ""),
+            "role": lead_data.get("role", "educator")
+        }
+        
+        # 1. Handle the Greeting specifically (remove "Hi " from template if we have a full greeting line)
+        # If template has "Hi {{ first_name }}," -> replace with "Hi Andrew," (or "Good morning,")
+        # But wait, greeting_line ALREADY contains "Hi " or "Good morning".
+        # So we should replace "Hi {{ first_name }}" with greeting_line WITHOUT the trailing comma if possible, 
+        # or just rely on the fact that greeting_line usually ends in comma? 
+        # Actually my code computes `greeting_line = "Hi Andrew,"` (with comma).
+        
+        # Let's try to match "Hi {{ first_name }}," or "Hi {{ first_name }}"
+        # Case A: Time based "Good morning,". We want to nuke the "Hi" in the template.
+        
+        # Robust Regex for Greeting:
+        # Match "Hi" (optional), whitespace, {{ first_name }}, comma(optional)
+        greeting_pattern = re.compile(r'(Hi\s*)?\{\{\s*first_name\s*\}\},?', re.IGNORECASE)
+        
+        # Check if we find it
+        if greeting_pattern.search(draft_body):
+            draft_body = greeting_pattern.sub(greeting_line, draft_body)
+        else:
+             # Fallback: Just simple variable replace if pattern doesn't match
+             draft_body = re.sub(r'\{\{\s*first_name\s*\}\}', first_name, draft_body)
+
+        # 2. Replace other variables (school_name, etc)
+        for key, val in replacements.items():
+            if key == "first_name": continue # Already handled
+            pattern = re.compile(r'\{\{\s*' + key + r'\s*\}\}', re.IGNORECASE)
+            draft_body = pattern.sub(str(val), draft_body)
              
         # Double check: ensure the greeting is at the top if replacement failed (e.g. template diff)
         # But for now, assume template compliance. 

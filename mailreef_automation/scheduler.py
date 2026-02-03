@@ -271,10 +271,16 @@ class EmailScheduler:
         results = []
         for prospect in prospects:
             try:
-                # Resolve sender email for dynamic sign-off (Using Cache)
-                self._refresh_inbox_map_if_needed()
-                sender_email = self.inbox_map.get(str(inbox_id), "unknown")
-                logger.info(f"🔍 DEBUG LOOKUP: ID={inbox_id} (Type: {type(inbox_id).__name__}) -> Sender: {sender_email}")
+                # Resolve sender email for dynamic sign-off
+                # Logic Update: If inbox_id LOOKS like an email, use it directly. 
+                # Otherwise, try the map.
+                if "@" in str(inbox_id):
+                    sender_email = str(inbox_id)
+                else:
+                    self._refresh_inbox_map_if_needed()
+                    sender_email = self.inbox_map.get(str(inbox_id), "unknown")
+                
+                logger.info(f"🔍 DEBUG LOOKUP: ID={inbox_id} -> Sender: {sender_email}")
 
                 # Use High-Fidelity Generator
                 logger.info(f"🚀 [SEND START] Generating personalized email for {prospect.get('email')} using sender {sender_email}...")
