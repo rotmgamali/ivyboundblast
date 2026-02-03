@@ -123,11 +123,27 @@ class EmailGenerator:
             logger.warning(f"⚠️ [SCRAPE SKIP] No 'domain' or 'website' found in lead data for {lead_data.get('email')}.")
         
         # Build Prompts (System + User)
-        system_prompt, user_prompt = self._prepare_school_prompts(
+        # UPDATE: Now returns envelope data (greeting, sign_off)
+        system_prompt, user_prompt, envelope = self._prepare_school_prompts(
             template_content, lead_data, website_content, sequence_number, sender_email
         )
         
-        return self._call_llm(user_prompt, system_prompt)
+        # Call LLM for Body & Subject
+        llm_result = self._call_llm(user_prompt, system_prompt)
+        
+        # --- ENVELOPE REASSEMBLY (The Fix) ---
+        # We stitch the deterministic Python parts with the AI creative parts.
+        
+        # 1. Clean AI Body (Strip ANY greeting/sign-off hallucinated by AI)
+        clean_body = self._strip_hallucinations(llm_result['body'], envelope['greeting'], envelope['sign_off'])
+        
+        # 2. Assemble Final Email
+        final_body = f"{envelope['greeting']}\n\n{clean_body}\n\n{envelope['sign_off']}"
+        
+        return {
+            "subject": llm_result['subject'],
+            "body": final_body
+        }
 
     def _get_archetype(self, role: str) -> str:
         """Map job title to archetype folder name."""
@@ -201,8 +217,11 @@ class EmailGenerator:
 
     def _prepare_school_prompts(self, template_content: str, lead_data: dict, website_content: str, sequence_number: int, sender_email: str) -> tuple:
         """
-        Constructs (system_message, user_message) for the LLM.
-        Performs Python-side string substitution to guarantee greeting correctness.
+        Constructs (system_message, user_message, envelope_dict).
+        Implements the ENVELOPE PATTERN: 
+        - Calculates Greeting/Sign-off in Python.
+        - Strips them from the template.
+        - Asks LLM for BODY ONLY.
         """
         
         # --- 1. Calculate Variables (Identity & Recipient) ---
@@ -242,9 +261,10 @@ class EmailGenerator:
         draft_body = template_content
         
         # Strategy: Pre-fill ALL known variables in the template so the LLM sees clean text.
+        school_name = lead_data.get("school_name", "your school")
         replacements = {
             "first_name": first_name,
-            "school_name": lead_data.get("school_name", "your school"),
+            "school_name": school_name,
             "city": lead_data.get("city", "your city"),
             "state": lead_data.get("state", ""),
             "role": lead_data.get("role", "educator")
@@ -280,45 +300,82 @@ class EmailGenerator:
         # Double check: ensure the greeting is at the top if replacement failed (e.g. template diff)
         # But for now, assume template compliance. 
         
-        # School/Location Context
-        school_name = lead_data.get("school_name", "your school")
-        city = lead_data.get("city", "")
-        state = lead_data.get("state", "")
-        location_txt = f"{city}, {state}" if city and state else ""
+        # --- 3. Template Stripping (The Cleaning) ---
+        # We need to give the AI only the BODY of the template.
+        # Logic: 
+        # 1. Identify Greeting (regex match for Hi/Dear/Good... ,)
+        # 2. Identify Sign-off (regex match for Best/Sincerely/SenderName)
+        # 3. Remove them.
         
-        # --- 3. System Prompt (Identity & Behavior) ---
-        system_prompt = f"""You are {sender_name}, a helpful consultant for private schools.
+        # We use the regex-substituted 'draft_body' which already has 'Hi Andrew,' inside.
+        
+        # Strip Greeting (Start of string)
+        # Matches: "Hi Andrew," or "Good morning," followed by newlines
+        clean_draft = re.sub(r'^\s*(?:Hi|Dear|Good|Hello).*?,\s*\n+', '', draft_body, flags=re.IGNORECASE|re.MULTILINE)
+        
+        # Strip Sign-off (End of string)
+        # Matches: "Best,\nMark..." or just "Mark" at end
+        # We aggressively cut anything after "Best," or "Sincerely," or the sender name.
+        # Note: This is heuristic.
+        for marker in ["Best,", "Sincerely,", "Warmly,", "Cheers,", "Thanks,", sender_name]:
+             if marker in clean_draft:
+                  clean_draft = clean_draft.split(marker)[0].strip()
+        
+        # --- 4. Envelope Definition ---
+        # Define the deterministic shell
+        sign_off_block = f"Best,\n{sender_name}"
+        envelope = {
+            "greeting": greeting_line,
+            "sign_off": sign_off_block
+        }
+        
+        # --- 5. System Prompt (Constraint) ---
+        system_prompt = f"""You are {sender_name}, a helpful consultant.
         
 STYLE GUIDE:
-- Tone: Human, warm, brief. No "marketing" fluff. Lowercase aesthetic preferred.
-- formatting: Standard email. No markdown headers (like **Subject**).
+- Tone: Human, warm, brief.
+- formatting: paragraphs only.
 - Absolute Rules:
-  1. NEVER invent facts. If research is missing, be generic but warm.
-  2. DO NOT change the starting greeting sent in the draft.
-  3. DO NOT add a second greeting (e.g. "Good morning... Good morning").
+  1. DO NOT include a greeting (e.g. "Hi...").
+  2. DO NOT include a sign-off (e.g. "Best, Mark").
+  3. OUTPUT ONLY the Subject and the Body paragraphs.
 """
 
-        # --- 4. User Prompt (The Task) ---
-        user_prompt = f"""Here is a DRAFT email I want to send to {first_name} ({lead_data.get('role')}) at {school_name}.
+        # --- 6. User Prompt (Body Generation) ---
+        user_prompt = f"""Here is the CORE CONTENT of an email I want to send to {first_name} ({lead_data.get('role')}) at {school_name}.
 
-DRAFT EMAIL:
+DRAFT CONTENT:
 '''
-{draft_body}
+{clean_draft}
 '''
 
 RESEARCH HIGHLIGHTS:
 {website_content[:3000]}
 
 TASK:
-Rewrite the draft to make it feel personal.
-- If possible, gently weave in 1 specific detail from the RESEARCH HIGHLIGHTS (a program, mission, or city reference).
-- Keep the greeting "{greeting_line}" EXACTLY as is.
-- Sign off as {sender_name}.
-- Output in this format:
+Rewrite the DRAFT CONTENT to make it feel personal.
+- Weave in 1 detail from RESEARCH HIGHLIGHTS if relevant.
+- write ONLY the body paragraphs.
+- Output format:
 SUBJECT: [Subject]
-BODY: [Body]
+BODY: [Paragraph 1]
+[Paragraph 2]...
 """
-        return system_prompt, user_prompt
+        return system_prompt, user_prompt, envelope
+
+    def _strip_hallucinations(self, body_text: str, greeting: str, sign_off: str) -> str:
+        """Failsafe: If AI wrote 'Hi Andrew,' anyway, remove it."""
+        # Clean Start
+        cleaned = re.sub(r'^\s*(?:Hi|Dear|Good|Hello).*?,\s*\n+', '', body_text, flags=re.IGNORECASE|re.MULTILINE)
+        # Clean End (Sign-off)
+        # Remove "Best," etc if strictly at end
+        cleaned = re.sub(r'\n\s*(?:Best|Sincerely|Warmly|Cheers|Thanks).*?$', '', cleaned, flags=re.IGNORECASE|re.DOTALL)
+        # Remove Name if at end
+        cleaned = re.sub(r'\n\s*Mark.*?$', '', cleaned, flags=re.IGNORECASE|re.DOTALL)
+        cleaned = re.sub(r'\n\s*Genelle.*?$', '', cleaned, flags=re.IGNORECASE|re.DOTALL)
+        cleaned = re.sub(r'\n\s*Andrew.*?$', '', cleaned, flags=re.IGNORECASE|re.DOTALL)
+        
+        return cleaned.strip()
 
     def _generate_legacy_email(self, campaign_type: str, sequence_number: int, lead_data: dict, enrichment_data: dict) -> dict:
         """Fallback for non-school campaigns."""
