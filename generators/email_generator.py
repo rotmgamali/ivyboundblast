@@ -182,6 +182,17 @@ class EmailGenerator:
         
         if path.exists():
             return path.read_text(encoding="utf-8")
+        
+        # Diagnostic: List files to see what's actually there
+        try:
+            if self.templates_dir.exists():
+                contents = os.listdir(self.templates_dir)
+                logger.debug(f"📁 [DIR LIST] Content of {self.templates_dir}: {contents}")
+            else:
+                logger.error(f"🚨 [DIR MISSING] Template directory NOT FOUND at {self.templates_dir}")
+        except Exception as e:
+            logger.debug(f"🔍 [DIR ERROR] Could not list directory: {e}")
+            
         return None
 
     def _get_school_prompt(self, template_content: str, lead_data: dict, website_content: str, sequence_number: int = 1) -> str:
