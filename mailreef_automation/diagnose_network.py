@@ -2,6 +2,38 @@ import os
 import socket
 import sys
 
+def check_manual_http_connect(proxy_addr, proxy_port, target_host, target_port, user, password):
+    """Manually attempt an HTTP CONNECT with full headers to bypass 407 errors."""
+    import base64
+    print(f"   Testing manual HTTP CONNECT to {target_host}:{target_port}...", end='', flush=True)
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(10)
+        s.connect((proxy_addr, proxy_port))
+        
+        auth = base64.b64encode(f"{user}:{password}".encode()).decode()
+        connect_req = (
+            f"CONNECT {target_host}:{target_port} HTTP/1.1\r\n"
+            f"Host: {target_host}:{target_port}\r\n"
+            f"Proxy-Authorization: Basic {auth}\r\n"
+            f"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n"
+            f"Proxy-Connection: Keep-Alive\r\n\r\n"
+        )
+        s.sendall(connect_req.encode())
+        response = s.recv(4096).decode()
+        if "200" in response or "Established" in response:
+            print(" ✅ SUCCESS (Tunnel Established)")
+            s.close()
+            return True
+        else:
+            first_line = response.splitlines()[0] if response else "No Response"
+            print(f" ❌ FAILURE ({first_line})")
+            s.close()
+            return False
+    except Exception as e:
+        print(f" ❌ ERROR ({e})")
+        return False
+
 def check_connection(host, port, timeout=10, proxy_info=None):
     """Try to open a TCP connection to host:port."""
     import socket
@@ -111,11 +143,23 @@ def run_diagnostics():
     
     if proxy_info:
         print("\nVia Proxy (Must succeed for sending):")
-        # Control Test: Port 443 (Should always work if proxy is OK)
-        print("--- Control Test (HTTPS) ---")
+        
+        # 1. Test standard PySocks (Current implementation)
+        print("--- Layer 1: PySocks (Standard) ---")
         check_connection("google.com", 443, proxy_info=proxy_info)
         
-        print("\n--- SMTP Tests ---")
+        # 2. Test Manual CONNECT (Enhanced Headers)
+        if proxy_info['proxy_type'] == socks.HTTP:
+            print("\n--- Layer 2: Manual HTTP CONNECT (Fixes 407) ---")
+            check_manual_http_connect(
+                proxy_info['proxy_addr'], 
+                proxy_info['proxy_port'],
+                target_host, 465,
+                proxy_info['proxy_username'],
+                proxy_info['proxy_password']
+            )
+        
+        print("\n--- Layer 3: SMTP Connection ---")
         check_connection(target_host, 465, proxy_info=proxy_info)
         check_connection(target_host, 587, proxy_info=proxy_info)
     else:
