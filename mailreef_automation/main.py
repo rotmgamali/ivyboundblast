@@ -62,19 +62,24 @@ def main():
             base_url=cfg.MAILREEF_API_BASE
         )
         
-        # Use relative path anchored to project root
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "campaign.db")
-        contacts = ContactManager(database_path=db_path)
+        # Cloud-First: We don't use SQLite anymore.
+        # db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "campaign.db")
+        # contacts = ContactManager(database_path=db_path)
         
-        # Check for stale locks from previous crashes
-        logger.info("Audit: Checking for stale lead locks...")
-        contacts.scan_stale_locks()
+        # Check for stale locks from previous crashes (Leaving this as it might be used by lock_util for process locks, but not db locks)
+        # logger.info("Audit: Checking for stale lead locks...")
+        # contacts.scan_stale_locks()
         
-        scheduler = EmailScheduler(
-            mailreef_client=mailreef,
-            contact_manager=contacts,
-            config=cfg
-        )
+        # Init Scheduler with Sheets
+        try:
+            scheduler = EmailScheduler(
+                mailreef_client=mailreef,
+                # contact_manager=contacts, # Removed
+                config=cfg
+            )
+        except Exception as e:
+            logger.critical(f"Failed to initialize scheduler (likely Sheets Auth error): {e}")
+            return
         
         monitor = DeliverabilityMonitor(mailreef, cfg)
         
@@ -89,9 +94,6 @@ def main():
             # Check inbox health
             logger.info("Checking inbox health...")
             for inbox in inboxes:
-                # Note: get_inbox_status in provided client code returns a dict.
-                # Assuming 'deliverability_score' exists or similar metric. 
-                # If not, we skip this check or catch key error.
                 try:
                     # Optimized to avoid 95 API calls on startup if not strictly necessary,
                     # but following the prompt's structure:
@@ -113,8 +115,8 @@ def main():
         logger.info("Starting deliverability monitoring...")
         monitor.start()
         
-        logger.info("Email automation system is now running")
-        logger.info(f"Daily capacity: {contacts.calculate_daily_capacity()}")
+        logger.info("Email automation system is now running (Sheets-First Mode)")
+        # logger.info(f"Daily capacity: {contacts.calculate_daily_capacity()}")
         
         # Keep the main thread alive
         while True:

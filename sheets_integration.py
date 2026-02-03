@@ -217,7 +217,9 @@ class GoogleSheetsClient:
         logger.info(f"Found {len(pending)} pending leads (returning up to {limit})")
         return pending[:limit]
     
-    def get_leads_for_followup(self, days_since_email_1: int = 4) -> List[Dict[str, Any]]:
+    def get_leads_for_followup(self, days_since_email_1: int = 3, 
+                               sender_email: Optional[str] = None,
+                               limit: int = 100) -> List[Dict[str, Any]]:
         """Get leads that received Email 1 and are due for Email 2."""
         worksheet = self.input_sheet.sheet1
         all_records = worksheet.get_all_records()
@@ -226,6 +228,10 @@ class GoogleSheetsClient:
         now = datetime.now()
         
         for record in all_records:
+            # Must match sender email if specified
+            if sender_email and record.get('sender_email') != sender_email:
+                continue
+                
             if record.get('status') == 'email_1_sent':
                 sent_at_str = record.get('email_1_sent_at', '')
                 if sent_at_str:
@@ -236,8 +242,11 @@ class GoogleSheetsClient:
                             followup_leads.append(record)
                     except ValueError:
                         pass
+            
+            if len(followup_leads) >= limit:
+                break
         
-        logger.info(f"Found {len(followup_leads)} leads due for follow-up")
+        logger.info(f"Found {len(followup_leads)} leads due for follow-up (Sender: {sender_email or 'Any'})")
         return followup_leads
     
     def update_lead_status(self, email: str, status: str, 

@@ -22,12 +22,24 @@ logger = get_logger("SCHEDULER")
 class EmailScheduler:
     """Manages the scheduling logic for all email sends"""
     
-    def __init__(self, mailreef_client, contact_manager, config):
+    def __init__(self, mailreef_client, config):
         self.mailreef = mailreef_client
-        self.contacts = contact_manager
+        # Remove SQLite ContactManager
+        # self.contacts = contact_manager 
         self.config = config
         self.scheduler = BackgroundScheduler(timezone=pytz.timezone('US/Eastern'))
         self.generator = EmailGenerator()
+        
+        # Cloud-Native: Sheets Integration
+        from sheets_integration import GoogleSheetsClient
+        self.sheets = GoogleSheetsClient()
+        self.sheets.setup_sheets()
+        
+        # Local Cache to prevent Sheets API Rate Limits
+        self._lead_cache = []
+        self._last_cache_update = datetime.min
+        self.CACHE_DURATION = timedelta(minutes=15)
+        
         self.is_running = False
         
     def calculate_daily_send_requirements(self, day_type):
@@ -68,13 +80,10 @@ class EmailScheduler:
         if day_type == "business":
             # Rotation logic: (day_of_year * 2) % total_inboxes
             # We want to PAUSE 2 inboxes.
-            # So we skip 2 inboxes starting at the calculated index.
             day_of_year = datetime.now(pytz.timezone('US/Eastern')).timetuple().tm_yday
             
             if total_inboxes_available > 0:
                 start_pause_index = (day_of_year * 2) % total_inboxes_available
-                
-                # Determine indices to pause (handling wrap-around)
                 paused_indices = {start_pause_index, (start_pause_index + 1) % total_inboxes_available}
                 
                 for i, inbox in enumerate(all_inboxes):
@@ -89,11 +98,6 @@ class EmailScheduler:
             # Weekend: All inboxes active
             active_inboxes = all_inboxes
             print("Weekend: All inboxes active")
-
-        # Limit to the requested count if for some reason we have more than needed 
-        # (though the logic above effectively selects the active set)
-        # The prompt "inbox_count" argument is actually "active_inboxes" count target from config.
-        # We should rely on our rotation logic which naturally results in Total - 2 for business days.
         
         emails_assigned_per_inbox = {}
         for inbox in active_inboxes:
@@ -105,20 +109,10 @@ class EmailScheduler:
             window_end = window["end"]
             
             for inbox_id in emails_assigned_per_inbox.keys():
-                current_count = emails_assigned_per_inbox[inbox_id]
-                
                 # We need to send 'emails_per_inbox' number of emails in this window
-                # The loop here was logic heavy in the prompt, simplifying to standard slot generation
-                
                 for _ in range(emails_per_inbox):
-                    # Add random jitter: send 20-40 minutes into window base
-                    # But we also need to distribute within the hour.
-                    # Simple approach: Pick a random minute in the hour
-                    
+                    # Add random jitter
                     random_minute = random.randint(0, 59)
-                    
-                    # Ensure we are within the window start/end hours
-                    # If window is 1 hour length, just use the start hour
                     
                     # If we are scheduling for the current hour, ensure send_time is in the future
                     now_est = datetime.now(pytz.timezone('US/Eastern'))
@@ -143,8 +137,6 @@ class EmailScheduler:
                     offset_seconds = random.randint(60, 300)
                     send_time = send_time + timedelta(seconds=offset_seconds)
                     
-                    # If send_time is in the past for today, we might want to schedule for tomorrow? 
-                    # But the daily queue runs at 5 AM, so this should generally be future.
                     # logger.debug(f"Generated slot for inbox {inbox_id} at {send_time} (Window: {window_start}:00)")
                     
                     slots.append({
@@ -155,15 +147,75 @@ class EmailScheduler:
                     
                     emails_assigned_per_inbox[inbox_id] += 1
         
+        # Sort slots by time to be nice
+        slots.sort(key=lambda x: x['scheduled_time'])
         return slots
     
+    def _refresh_cache_if_needed(self):
+        """Refresh local lead cache if expired or empty"""
+        now = datetime.now()
+        if not self._lead_cache or (now - self._last_cache_update) > self.CACHE_DURATION:
+            logger.info("🔄 Refreshing lead cache from Sheets...")
+            try:
+                # Fetch more than we strictly need to act as a buffer
+                new_batch = self.sheets.get_pending_leads(limit=50) 
+                
+                # Check for duplicates to avoid re-adding if cache isn't fully empty
+                # Actually, simpler to just replace cache and assume FIFO
+                if new_batch:
+                    self._lead_cache = new_batch
+                    self._last_cache_update = now
+                    logger.info(f"✅ Cached {len(new_batch)} fresh leads.")
+                else:
+                    logger.warning("⚠️ No pending leads found in Sheet!")
+            except Exception as e:
+                logger.error(f"❌ Failed to refresh cache: {e}")
+
     def select_prospects_for_send(self, inbox_id, count, sequence_stage):
-        """Select prospects for a specific send slot"""
-        return self.contacts.get_pending_for_inbox(
-            inbox_id=inbox_id,
-            count=count,
-            sequence_stage=sequence_stage
-        )
+        """Select prospects for a specific send slot (Sheets-First)"""
+        
+        # Stage 2: Lead Consistency
+        # Must find a lead that was sent Email 1 by THIS inbox
+        if sequence_stage == 2:
+            try:
+                # Get sending email address for this inbox ID
+                inbox_email = None
+                # Slow but safe: fetch inbox list to find email. 
+                # Ideally, we cache this map too.
+                # For now, let's assume we can tolerate one API call? 
+                # No, better: The 'slots' generator already fetched inboxes. 
+                # But 'execute_slot' doesn't have that list.
+                # Let's do a quick lookup helper
+                inboxes = self.mailreef.get_inboxes()
+                for ibx in inboxes:
+                    if str(ibx['id']) == str(inbox_id):
+                        inbox_email = ibx['email']
+                        break
+                
+                if inbox_email:
+                    return self.sheets.get_leads_for_followup(sender_email=inbox_email, limit=count)
+                else:
+                    logger.warning(f"Could not resolve email for inbox ID {inbox_id}")
+                    return []
+            except Exception as e:
+                logger.error(f"Error fetching follow-ups: {e}")
+                return []
+
+        # Stage 1: New Leads (Use Cache)
+        if sequence_stage == 1:
+            self._refresh_cache_if_needed()
+            
+            # Pop from cache
+            selected = []
+            for _ in range(count):
+                if self._lead_cache:
+                    selected.append(self._lead_cache.pop(0))
+                else:
+                    break
+            
+            return selected
+            
+        return []
     
     def execute_send(self, inbox_id, prospects, sequence_number=1):
         """Execute the actual send via Mailreef API"""
@@ -173,8 +225,7 @@ class EmailScheduler:
                 # Use High-Fidelity Generator
                 logger.info(f"🚀 [SEND START] Generating personalized email for {prospect.get('email')}...")
                 
-                # Note: ContactManager Row provides 'school_name', 'domain', 'first_name', 'role', etc.
-                # Enrichment data is handled inside generator via live scrape
+                # Note: Sheets Row provides 'school_name', 'domain', 'first_name', 'role', etc.
                 result = self.generator.generate_email(
                     campaign_type="school",
                     sequence_number=sequence_number,
@@ -194,32 +245,42 @@ class EmailScheduler:
                 
                 logger.info(f"✅ [SEND SUCCESS] Email sent to {prospect['email']} via inbox {inbox_id}. MsgID: {response.get('message_id')}")
                 
-                self.contacts.record_send(
-                    contact_id=prospect["id"],
-                    inbox_id=inbox_id,
-                    campaign_id=1, # Default campaign
-                    sequence_stage=sequence_number,
-                    message_id=response.get("message_id")
+                # Sheets-First: Update Status Immediately
+                # We need the sender email to record who sent it
+                # We can perform a lookup or pass it if available.
+                # Optimization: get email from result/response or lookup?
+                # Mailreef API response might contain 'from'? Probably not.
+                # Let's resolve specific sender email again or assume rotation logic valid.
+                
+                # Fetch sender email just for logging (could optimize this out)
+                sender_email = "unknown"
+                try:
+                    inboxes = self.mailreef.get_inboxes()
+                    for ibx in inboxes:
+                        if str(ibx['id']) == str(inbox_id):
+                            sender_email = ibx['email']
+                            break
+                except: pass
+
+                status = f"email_{sequence_number}_sent"
+                self.sheets.update_lead_status(
+                    email=prospect["email"],
+                    status=status,
+                    sent_at=datetime.now(),
+                    sender_email=sender_email
                 )
                 
                 results.append({
-                    "prospect_id": prospect["id"],
+                    "email": prospect["email"],
                     "status": "sent",
                     "mailreef_message_id": response.get("message_id")
                 })
             except Exception as e:
                 # Log failure
                 logger.error(f"❌ [SEND FAILURE] Failed to send to {prospect.get('email')}: {e}")
-                self.contacts.record_send(
-                    contact_id=prospect["id"],
-                    inbox_id=inbox_id,
-                    campaign_id=1, 
-                    sequence_stage=1, 
-                    message_id=None,
-                    status="failed",
-                    error=str(e)
-                )
-
+                # Optional: Mark as failed in sheet?
+                # self.sheets.update_lead_status(prospect["email"], "failed")
+                
         return results
     
     def start(self):
@@ -270,10 +331,6 @@ class EmailScheduler:
         
         # Schedule each slot
         for slot in slots:
-            # Note: In a real high-volume system, you might not schedule 2000 individual jobs.
-            # You might schedule 'windows' that process a batch.
-            # But for 95 inboxes * 2 emails/hour, it's manageable.
-            
             self.scheduler.add_job(
                 self._execute_slot,
                 'date',
@@ -298,4 +355,5 @@ class EmailScheduler:
             logger.info(f"⏰ [SLOT FIRE] Executing Stage {stage} send for {prospects[0].get('email')} from inbox {inbox_id}")
             self.execute_send(inbox_id, prospects, sequence_number=stage)
         else:
-            logger.debug(f"🔇 [SLOT FIRE] No prospects (Stage 1 or 2) found for inbox {inbox_id} at {scheduled_time}")
+             # logger.debug(f"🔇 [SLOT FIRE] No prospects (Stage 1 or 2) found for inbox {inbox_id} at {scheduled_time}")
+             pass
