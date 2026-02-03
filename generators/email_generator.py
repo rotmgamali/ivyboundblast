@@ -89,12 +89,15 @@ class EmailGenerator:
         
         # Load Template
         template_content = self._load_template_file(archetype, sequence_number)
-        if not template_content:
-            logger.warning(f"Template not found for {archetype}/{sequence_number}. Using general.")
+        
+        # Fallback to general if not found and archetype isn't already general
+        if not template_content and archetype != "general":
+            logger.info(f"ℹ️ Template for {archetype}/{sequence_number} not found. Falling back to general.")
             template_content = self._load_template_file("general", sequence_number)
             
         if not template_content:
-            return {"subject": "Error", "body": "Template missing."}
+            logger.error(f"❌ Template missing for {archetype}/{sequence_number} and fallback general failed.")
+            return {"subject": "Quick question", "body": "I'd love to connect regarding SAT/ACT prep at your school."}
 
         # Website Scraping
         website_content = enrichment_data.get("website_content", "")
@@ -143,8 +146,6 @@ class EmailGenerator:
                 return ""
             # If name matches the school name exactly
             if lower_name == school_name:
-                return ""
-                
                 return ""
                 
         return name
