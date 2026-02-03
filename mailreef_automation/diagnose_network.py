@@ -1,11 +1,19 @@
-import socket
-import sys
+import os
 
-def check_connection(host, port, timeout=5):
+def check_connection(host, port, timeout=10, proxy_info=None):
     """Try to open a TCP connection to host:port."""
-    print(f"   Testing connectivity to {host}:{port}...", end='', flush=True)
+    target_desc = f"{host}:{port}"
+    if proxy_info:
+        print(f"   Testing connectivity to {target_desc} via Proxy...", end='', flush=True)
+    else:
+        print(f"   Testing connectivity to {target_desc} (Direct)...", end='', flush=True)
+        
     try:
-        sock = socket.create_connection((host, port), timeout=timeout)
+        if proxy_info:
+            import socks
+            sock = socks.create_connection((host, port), timeout=timeout, **proxy_info)
+        else:
+            sock = socket.create_connection((host, port), timeout=timeout)
         sock.close()
         print(" ✅ SUCCESS")
         return True
@@ -20,12 +28,32 @@ def check_connection(host, port, timeout=5):
     return False
 
 def run_diagnostics():
+    import socket
     print("\n" + "="*50)
     print("🩺 NETWORK DIAGNOSTICS START")
     print("="*50)
-
+    
     target_host = "smtp.errorskin.com"
     
+    # Check for proxy config
+    SOCKS_PROXY = os.getenv("SOCKS_PROXY_URL")
+    proxy_info = None
+    if SOCKS_PROXY:
+        try:
+            import socks
+            from urllib.parse import urlparse
+            proxy_parts = urlparse(SOCKS_PROXY)
+            proxy_info = {
+                'proxy_type': socks.SOCKS5 if 'socks5' in proxy_parts.scheme else socks.HTTP,
+                'proxy_addr': proxy_parts.hostname,
+                'proxy_port': proxy_parts.port or 1080,
+                'proxy_rdns': True,
+                'proxy_username': proxy_parts.username,
+                'proxy_password': proxy_parts.password
+            }
+        except Exception:
+            pass
+
     # 1. Environment Check
     try:
         hostname = socket.gethostname()
@@ -48,18 +76,19 @@ def run_diagnostics():
 
     # 3. Port Connectivity
     print("\n🔌 Connectivity Check:")
-    port_465 = check_connection(target_host, 465)
-    port_587 = check_connection(target_host, 587)
+    print("Direct (Should fail if cloud):")
+    check_connection(target_host, 465)
+    check_connection(target_host, 587)
     
-    # Summary
-    print("\n📝 Result:")
-    if port_465 or port_587:
-        print("   ✅ Mail server is REACHABLE on at least one port.")
+    if proxy_info:
+        print("\nVia Proxy (Must succeed for sending):")
+        check_connection(target_host, 465, proxy_info=proxy_info)
+        check_connection(target_host, 587, proxy_info=proxy_info)
     else:
-        print("   ❌ Mail server is UNREACHABLE on standard SMTP ports.")
-        print("      Likely Cause: Cloud Firewall (Egress Block) or IP Blacklist.")
+        print("\n⚠️ No SOCKS_PROXY_URL configured. Proxy check skipped.")
     
     print("="*50 + "\n")
 
 if __name__ == "__main__":
     run_diagnostics()
+

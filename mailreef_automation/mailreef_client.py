@@ -15,28 +15,57 @@ import socket
 
 # Check for SOCKS Proxy to bypass cloud firewalls
 SOCKS_PROXY = os.getenv("SOCKS_PROXY_URL")  # Format: socks5://user:pass@host:port
-if SOCKS_PROXY:
+
+def get_proxy_config():
+    if not SOCKS_PROXY:
+        return None
     try:
         import socks
         from urllib.parse import urlparse
-        
         proxy_parts = urlparse(SOCKS_PROXY)
-        proxy_type = socks.SOCKS5 if 'socks5' in proxy_parts.scheme else socks.HTTP
-        
-        # Extract credentials and host
-        username = proxy_parts.username
-        password = proxy_parts.password
-        host = proxy_parts.hostname
-        port = proxy_parts.port or 1080
-        
-        # Patch the socket to route all traffic via proxy
-        socks.set_default_proxy(proxy_type, host, port, True, username, password)
-        socket.socket = socks.socksocket
-        print(f"🔒 Tunneling via SOCKS Proxy: {host}:{port}")
-    except ImportError:
-        print("⚠️ SOCKS_PROXY_URL set but PySocks not installed. Install it via pip.")
+        return {
+            'proxy_type': socks.SOCKS5 if 'socks5' in proxy_parts.scheme else socks.HTTP,
+            'proxy_addr': proxy_parts.hostname,
+            'proxy_port': proxy_parts.port or 1080,
+            'proxy_rdns': True,
+            'proxy_username': proxy_parts.username,
+            'proxy_password': proxy_parts.password
+        }
     except Exception as e:
-        print(f"❌ Failed to configure SOCKS proxy: {e}")
+        print(f"⚠️ Failed to parse SOCKS_PROXY_URL: {e}")
+        return None
+
+class ProxySMTP(smtplib.SMTP):
+    """SMTP class that routes traffic through a SOCKS proxy."""
+    def __init__(self, *args, **kwargs):
+        self.proxy_info = get_proxy_config()
+        super().__init__(*args, **kwargs)
+
+    def _get_socket(self, host, port, timeout):
+        if self.proxy_info:
+            import socks
+            return socks.create_connection(
+                (host, port), 
+                timeout=timeout,
+                **self.proxy_info
+            )
+        return super()._get_socket(host, port, timeout)
+
+class ProxySMTP_SSL(smtplib.SMTP_SSL):
+    """SMTP_SSL class that routes traffic through a SOCKS proxy."""
+    def __init__(self, *args, **kwargs):
+        self.proxy_info = get_proxy_config()
+        super().__init__(*args, **kwargs)
+
+    def _get_socket(self, host, port, timeout):
+        if self.proxy_info:
+            import socks
+            return socks.create_connection(
+                (host, port), 
+                timeout=timeout,
+                **self.proxy_info
+            )
+        return super()._get_socket(host, port, timeout)
 
 logger = get_logger("MAILREEF_CLIENT")
 
@@ -180,12 +209,12 @@ class MailreefClient:
             logger.debug(f"🔌 [SMTP CONNECT] Connecting to {smtp_host}:{primary_port} for {inbox_id}...")
             if primary_port == 465:
                 # Implicit SSL
-                with smtplib.SMTP_SSL(smtp_host, primary_port, timeout=60) as server:
+                with ProxySMTP_SSL(smtp_host, primary_port, timeout=60) as server:
                     server.login(smtp_user, smtp_pass)
                     server.send_message(msg)
             else:
                 # STARTTLS
-                with smtplib.SMTP(smtp_host, primary_port, timeout=60) as server:
+                with ProxySMTP(smtp_host, primary_port, timeout=60) as server:
                     server.starttls()
                     server.login(smtp_user, smtp_pass)
                     server.send_message(msg)
@@ -199,11 +228,11 @@ class MailreefClient:
             try:
                 # Attempt Secondary Port
                 if secondary_port == 465:
-                    with smtplib.SMTP_SSL(smtp_host, secondary_port, timeout=60) as server:
+                    with ProxySMTP_SSL(smtp_host, secondary_port, timeout=60) as server:
                         server.login(smtp_user, smtp_pass)
                         server.send_message(msg)
                 else:
-                    with smtplib.SMTP(smtp_host, secondary_port, timeout=60) as server:
+                    with ProxySMTP(smtp_host, secondary_port, timeout=60) as server:
                         server.starttls()
                         server.login(smtp_user, smtp_pass)
                         server.send_message(msg)
