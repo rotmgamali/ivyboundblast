@@ -37,8 +37,11 @@ class EmailScheduler:
         
         # Local Cache to prevent Sheets API Rate Limits
         self._lead_cache = []
+        self._followup_cache = {} # inbox_id -> list
         self._last_cache_update = datetime.min
-        self.CACHE_DURATION = timedelta(minutes=15)
+        self._last_followup_update = datetime.min
+        self.CACHE_TTL = timedelta(minutes=5)
+        self.FOLLOWUP_CACHE_TTL = timedelta(minutes=10)
         
         self.is_running = False
         
@@ -154,22 +157,38 @@ class EmailScheduler:
     def _refresh_cache_if_needed(self):
         """Refresh local lead cache if expired or empty"""
         now = datetime.now()
-        if not self._lead_cache or (now - self._last_cache_update) > self.CACHE_DURATION:
-            logger.info("🔄 Refreshing lead cache from Sheets...")
+        if not self._lead_cache or (now - self._last_cache_update) > self.CACHE_TTL:
+            logger.info("🔄 Refreshing Stage 1 lead cache...")
             try:
-                # Fetch more than we strictly need to act as a buffer
+                # Use sheets_integration's fetch_all_records (which is also cached)
                 new_batch = self.sheets.get_pending_leads(limit=50) 
                 
-                # Check for duplicates to avoid re-adding if cache isn't fully empty
-                # Actually, simpler to just replace cache and assume FIFO
                 if new_batch:
                     self._lead_cache = new_batch
                     self._last_cache_update = now
-                    logger.info(f"✅ Cached {len(new_batch)} fresh leads.")
+                    logger.info(f"✅ Cached {len(new_batch)} fresh Stage 1 leads.")
                 else:
-                    logger.warning("⚠️ No pending leads found in Sheet!")
+                    logger.warning("⚠️ No pending Stage 1 leads found!")
             except Exception as e:
-                logger.error(f"❌ Failed to refresh cache: {e}")
+                # Log only the first line of the error to avoid 429 flood noise
+                logger.error(f"❌ Lead cache refresh failed: {str(e).splitlines()[0]}")
+
+    def _refresh_followup_cache_if_needed(self, sender_email, inbox_id):
+        """Refresh local follow-up cache for a specific sender"""
+        now = datetime.now()
+        last_update = self._last_followup_update
+        
+        # Check if we need to refresh (global TTL for now for simplicity, or per-sender if needed)
+        # Using inbox_id as key for easier direct lookup
+        if inbox_id not in self._followup_cache or (now - last_update) > self.FOLLOWUP_CACHE_TTL:
+            logger.info(f"🔄 Refreshing Stage 2 cache for {sender_email}...")
+            try:
+                new_batch = self.sheets.get_leads_for_followup(sender_email=sender_email, limit=20)
+                self._followup_cache[inbox_id] = new_batch
+                self._last_followup_update = now
+                logger.debug(f"✅ Cached {len(new_batch)} follow-ups for {sender_email}")
+            except Exception as e:
+                logger.error(f"❌ Follow-up cache refresh failed for {sender_email}: {str(e).splitlines()[0]}")
 
     def select_prospects_for_send(self, inbox_id, count, sequence_stage):
         """Select prospects for a specific send slot (Sheets-First)"""
@@ -178,31 +197,30 @@ class EmailScheduler:
         # Must find a lead that was sent Email 1 by THIS inbox
         if sequence_stage == 2:
             try:
-                # Optimized: If inbox_id looks like an email, use it directly (saves API call & error prone lookup)
-                if '@' in str(inbox_id):
-                    inbox_email = str(inbox_id)
-                else:
-                    # Slow but safe: fetch inbox list to find email. 
-                    inbox_email = None
+                # Optimized: If inbox_id looks like an email, use it directly
+                inbox_email = str(inbox_id) if '@' in str(inbox_id) else None
+                
+                if not inbox_email:
+                    # Resolve ID to email
                     inboxes = self.mailreef.get_inboxes()
                     for ibx in inboxes:
                         if str(ibx.get('id')) == str(inbox_id):
-                            # API might return 'email' or 'address'
                             inbox_email = ibx.get('email') or ibx.get('address')
-                            # Fallback: construct from username@domain if available
-                            if not inbox_email and ibx.get('username') and ibx.get('domain'):
-                                inbox_email = f"{ibx['username']}@{ibx['domain']}"
                             break
                 
                 if inbox_email:
-                    return self.sheets.get_leads_for_followup(sender_email=inbox_email, limit=count)
+                    self._refresh_followup_cache_if_needed(inbox_email, inbox_id)
+                    
+                    # Pop from follow-up cache
+                    if self._followup_cache.get(inbox_id):
+                        selected = [self._followup_cache[inbox_id].pop(0)]
+                        return selected
+                    return []
                 else:
-                    logger.warning(f"Could not resolve email for inbox ID {inbox_id} (Data: {inboxes[0] if 'inboxes' in locals() and inboxes else 'Empty'})")
+                    logger.warning(f"Could not resolve email for inbox ID {inbox_id}")
                     return []
             except Exception as e:
-                logger.error(f"Error fetching follow-ups for inbox {inbox_id}: {e}")
-                import traceback
-                logger.error(traceback.format_exc())
+                logger.error(f"Error selecting follow-up: {str(e).splitlines()[0]}")
                 return []
 
         # Stage 1: New Leads (Use Cache)

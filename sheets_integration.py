@@ -15,14 +15,17 @@ Usage:
 import os
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 
+import time
+from functools import wraps
 import gspread
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from gspread.exceptions import APIError
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -50,7 +53,46 @@ class GoogleSheetsClient:
         self.client: Optional[gspread.Client] = None
         self.input_sheet: Optional[gspread.Spreadsheet] = None
         self.replies_sheet: Optional[gspread.Spreadsheet] = None
+        
+        # Caching
+        self._cache = {} # email -> record
+        self._all_records_cache = None
+        self._last_all_records_fetch = datetime.min
+        self.CACHE_TTL = timedelta(minutes=5)
+        
         self._authenticate()
+
+    def retry_on_quota(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            max_retries = 3
+            for i in range(max_retries):
+                try:
+                    return f(*args, **kwargs)
+                except APIError as e:
+                    if "[429]" in str(e) and i < max_retries - 1:
+                        wait = (i + 1) * 30 
+                        logger.warning(f"⚠️ Google Sheets Quota hit. Waiting {wait}s before retry {i+1}/{max_retries}...")
+                        time.sleep(wait)
+                        continue
+                    raise
+            return f(*args, **kwargs)
+        return wrapper
+
+    @retry_on_quota
+    def _fetch_all_records(self):
+        """Internal helper to fetch all records with caching."""
+        now = datetime.now()
+        if self._all_records_cache is None or (now - self._last_all_records_fetch) > self.CACHE_TTL:
+            logger.info("📡 Fetching fresh records from Google Sheets...")
+            worksheet = self.input_sheet.sheet1
+            self._all_records_cache = worksheet.get_all_records()
+            self._last_all_records_fetch = now
+            # Warm up individual cache
+            for record in self._all_records_cache:
+                if record.get('email'):
+                    self._cache[record['email']] = record
+        return self._all_records_cache
     
     def _authenticate(self):
         """Authenticate with Google using OAuth credentials or a service account/token from env."""
@@ -206,8 +248,7 @@ class GoogleSheetsClient:
     
     def get_pending_leads(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Get leads that haven't been contacted yet."""
-        worksheet = self.input_sheet.sheet1
-        all_records = worksheet.get_all_records()
+        all_records = self._fetch_all_records()
         
         pending = [
             record for record in all_records 
@@ -221,8 +262,7 @@ class GoogleSheetsClient:
                                sender_email: Optional[str] = None,
                                limit: int = 100) -> List[Dict[str, Any]]:
         """Get leads that received Email 1 and are due for Email 2."""
-        worksheet = self.input_sheet.sheet1
-        all_records = worksheet.get_all_records()
+        all_records = self._fetch_all_records()
         
         followup_leads = []
         now = datetime.now()
@@ -249,6 +289,7 @@ class GoogleSheetsClient:
         logger.info(f"Found {len(followup_leads)} leads due for follow-up (Sender: {sender_email or 'Any'})")
         return followup_leads
     
+    @retry_on_quota
     def update_lead_status(self, email: str, status: str, 
                            sent_at: Optional[datetime] = None,
                            sender_email: Optional[str] = None):
@@ -257,14 +298,20 @@ class GoogleSheetsClient:
         
         # Find the row with this email
         try:
+            # Check cache for row if possible or search
+            # gspread's find() is an API call, let's try to optimize if we can
+            # But search is safer for status consistency
             cell = worksheet.find(email)
             row = cell.row
             
             # Get column indices (1-indexed)
             headers = worksheet.row_values(1)
-            status_col = headers.index('status') + 1
             
-            updates = [(row, status_col, status)]
+            # Prepare batch updates
+            cell_list = []
+            
+            status_col = headers.index('status') + 1
+            cell_list.append(gspread.Cell(row, status_col, status))
             
             if sent_at:
                 if status == 'email_1_sent':
@@ -275,16 +322,23 @@ class GoogleSheetsClient:
                     col = None
                 
                 if col:
-                    updates.append((row, col, sent_at.isoformat()))
+                    cell_list.append(gspread.Cell(row, col, sent_at.isoformat()))
             
             if sender_email:
                 sender_col = headers.index('sender_email') + 1
-                updates.append((row, sender_col, sender_email))
+                cell_list.append(gspread.Cell(row, sender_col, sender_email))
             
-            for r, c, v in updates:
-                worksheet.update_cell(r, c, v)
+            # Perform Batch Update
+            worksheet.update_cells(cell_list)
             
-            logger.info(f"Updated {email} status to {status}")
+            # Invalidate local cache for this email
+            if email in self._cache:
+                self._cache[email].update({
+                    'status': status,
+                    'sender_email': sender_email or self._cache[email].get('sender_email')
+                })
+            
+            logger.info(f"Updated {email} status to {status} (Batch)")
             
         except gspread.CellNotFound:
             logger.warning(f"Lead not found: {email}")
