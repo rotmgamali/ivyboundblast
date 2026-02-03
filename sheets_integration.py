@@ -86,14 +86,28 @@ class GoogleSheetsClient:
         if self._all_records_cache is None or (now - self._last_all_records_fetch) > self.CACHE_TTL:
             logger.info("📡 Fetching fresh records from Google Sheets...")
             worksheet = self.input_sheet.sheet1
-            self._all_records_cache = worksheet.get_all_records()
-            self._last_all_records_fetch = now
-            # Warm up individual cache with row numbers
-            # index i in get_all_records corresponds to row i + 2 (1-based headers)
-            for i, record in enumerate(self._all_records_cache):
+            raw_records = worksheet.get_all_records()
+            
+            # Normalize Headers: lowercase and map synonyms
+            normalized = []
+            for i, raw in enumerate(raw_records):
+                record = {}
+                for k, v in raw.items():
+                    norm_k = str(k).lower().strip().replace(' ', '_')
+                    # Map common synonyms
+                    if norm_k in ['job_title', 'title', 'position']: norm_k = 'role'
+                    if norm_k in ['website', 'url', 'site']: norm_k = 'domain'
+                    if norm_k in ['school', 'company', 'organization']: norm_k = 'school_name'
+                    
+                    record[norm_k] = v
+                
                 if record.get('email'):
                     record['_row'] = i + 2
+                    normalized.append(record)
                     self._cache[record['email']] = record
+            
+            self._all_records_cache = normalized
+            self._last_all_records_fetch = now
         return self._all_records_cache
     
     def _authenticate(self):
