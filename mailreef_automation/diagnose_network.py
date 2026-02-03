@@ -144,6 +144,17 @@ def run_diagnostics():
     if proxy_info:
         print("\nVia Proxy (Must succeed for sending):")
         
+        # 0. Control Check: Port 443 (Should always work if proxy is OK)
+        if proxy_info['proxy_type'] == socks.HTTP:
+            print("--- Layer 0: Manual HTTP CONNECT (Control: Port 443) ---")
+            check_manual_http_connect(
+                proxy_info['proxy_addr'], 
+                proxy_info['proxy_port'],
+                "google.com", 443,
+                proxy_info['proxy_username'],
+                proxy_info['proxy_password']
+            )
+
         # 1. Test standard PySocks (Current implementation)
         print("--- Layer 1: PySocks (Standard) ---")
         check_connection("google.com", 443, proxy_info=proxy_info)
