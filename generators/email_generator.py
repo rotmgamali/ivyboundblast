@@ -147,10 +147,10 @@ class EmailGenerator:
         # Check against School Name
         school_name = lead_data.get("school_name", "").lower()
         if school_name:
-            # If name is just the first word of school (e.g. "Harvest" from "Harvest Academy")
-            school_parts = school_name.split()
-            if school_parts and lower_name == school_parts[0]:
-                return ""
+            # If name is just the first word of school (REMOVED: Too aggressive, blocks 'Viva')
+            # school_parts = school_name.split()
+            # if school_parts and lower_name == school_parts[0]:
+            #    return ""
             # If name matches the school name exactly
             if lower_name == school_name:
                 return ""
@@ -244,7 +244,9 @@ class EmailGenerator:
         # If we have a time greeting (starts with Good), use it directly.
         if first_name.startswith("Good "):
             greeting_line = f"{first_name},"
-            template_instruction = f"IMPORTANT: Start the email with '{greeting_line}' exactly. Do NOT write 'Hi {first_name}'."
+            # Simplified: Let the template replacement handle it.
+            # Removing the "IMPORTANT: Start with..." line prevents the double greeting.
+            template_instruction = ""
         else:
             greeting_line = f"Hi {first_name},"
             template_instruction = ""

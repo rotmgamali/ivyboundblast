@@ -43,6 +43,11 @@ class EmailScheduler:
         self.CACHE_TTL = timedelta(minutes=5)
         self.FOLLOWUP_CACHE_TTL = timedelta(minutes=10)
         
+        # Inbox Identity Cache (ID -> Email)
+        self.inbox_map = {} 
+        self._last_inbox_refresh = datetime.min
+        self.INBOX_REFRESH_TTL = timedelta(minutes=60)
+        
         self.is_running = False
         
     def calculate_daily_send_requirements(self, day_type):
@@ -190,6 +195,27 @@ class EmailScheduler:
             except Exception as e:
                 logger.error(f"❌ Follow-up cache refresh failed for {sender_email}: {str(e).splitlines()[0]}")
 
+    def _refresh_inbox_map_if_needed(self):
+        """Refresh the ID->Email map for sign-offs"""
+        now = datetime.now()
+        if not self.inbox_map or (now - self._last_inbox_refresh) > self.INBOX_REFRESH_TTL:
+            try:
+                logger.info("REFRESHING inbox identity map...")
+                inboxes = self.mailreef.get_inboxes()
+                new_map = {}
+                for ibx in inboxes:
+                    # differnet schemas/fields sometimes
+                    email = ibx.get('email') or ibx.get('address')
+                    if email:
+                        new_map[str(ibx['id'])] = email
+                
+                if new_map:
+                    self.inbox_map = new_map
+                    self._last_inbox_refresh = now
+                    logger.info(f"✅ Cached {len(new_map)} inbox identities.")
+            except Exception as e:
+                logger.error(f"Failed to refresh inbox map: {e}")
+
     def select_prospects_for_send(self, inbox_id, count, sequence_stage):
         """Select prospects for a specific send slot (Sheets-First)"""
         
@@ -244,15 +270,9 @@ class EmailScheduler:
         results = []
         for prospect in prospects:
             try:
-                # Resolve sender email for dynamic sign-off
-                sender_email = "unknown"
-                try:
-                    inboxes = self.mailreef.get_inboxes()
-                    for ibx in inboxes:
-                        if str(ibx['id']) == str(inbox_id):
-                            sender_email = ibx['email'] or ibx.get('address', 'unknown')
-                            break
-                except: pass
+                # Resolve sender email for dynamic sign-off (Using Cache)
+                self._refresh_inbox_map_if_needed()
+                sender_email = self.inbox_map.get(str(inbox_id), "unknown")
 
                 # Use High-Fidelity Generator
                 logger.info(f"🚀 [SEND START] Generating personalized email for {prospect.get('email')} using sender {sender_email}...")
