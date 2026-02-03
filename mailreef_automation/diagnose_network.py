@@ -1,4 +1,6 @@
 import os
+import socket
+import sys
 
 def check_connection(host, port, timeout=10, proxy_info=None):
     """Try to open a TCP connection to host:port."""
