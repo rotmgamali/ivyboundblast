@@ -291,7 +291,8 @@ TEMPLATE (Use the flow and core message, but make the wording feel human and nat
 ---
 
 INSTRUCTION: {template_instruction}
-If the template says "Hi {{first_name}}", replace it with "{greeting_line}".
+INSTRUCTION: {template_instruction}
+If the template says "Hi {{first_name}}", replace that EXACT string with "{greeting_line}". Do NOT add an extra greeting at the start.
 
 VERIFIED DATA (ONLY use these facts):
 - Recipient: {first_name}

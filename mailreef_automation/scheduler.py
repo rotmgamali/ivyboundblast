@@ -213,6 +213,7 @@ class EmailScheduler:
                     self.inbox_map = new_map
                     self._last_inbox_refresh = now
                     logger.info(f"✅ Cached {len(new_map)} inbox identities.")
+                    logger.info(f"🔍 DEBUG INBOX MAP: {self.inbox_map}")
             except Exception as e:
                 logger.error(f"Failed to refresh inbox map: {e}")
 
@@ -273,6 +274,7 @@ class EmailScheduler:
                 # Resolve sender email for dynamic sign-off (Using Cache)
                 self._refresh_inbox_map_if_needed()
                 sender_email = self.inbox_map.get(str(inbox_id), "unknown")
+                logger.info(f"🔍 DEBUG LOOKUP: ID={inbox_id} (Type: {type(inbox_id).__name__}) -> Sender: {sender_email}")
 
                 # Use High-Fidelity Generator
                 logger.info(f"🚀 [SEND START] Generating personalized email for {prospect.get('email')} using sender {sender_email}...")
