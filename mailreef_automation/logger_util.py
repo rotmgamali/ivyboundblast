@@ -57,4 +57,9 @@ def get_logger(name: str):
         # Don't crash logging if telegram fails setup
         print(f"Failed to add Telegram handler: {e}")
     
+    logging.getLogger('apscheduler.executors.default').setLevel(logging.ERROR)
+    logging.getLogger('apscheduler.scheduler').setLevel(logging.ERROR)
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger('googleapiclient').setLevel(logging.WARNING)
+    
     return logger
