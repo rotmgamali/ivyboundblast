@@ -137,23 +137,28 @@ class MailreefClient:
         logger.debug(f"🔌 [SMTP CONNECT] Connecting to {smtp_host}:{smtp_port} for {inbox_id}...")
         try:
             if smtp_port == 465:
-                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30) as server:
+                # Increased timeout to 60s for stability
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=60) as server:
                     server.login(smtp_user, smtp_pass)
                     server.send_message(msg)
             else:
                 try:
-                    with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
+                    with smtplib.SMTP(smtp_host, smtp_port, timeout=60) as server:
                         server.starttls()
                         server.login(smtp_user, smtp_pass)
                         server.send_message(msg)
-                except (smtplib.SMTPConnectError, ConnectionRefusedError):
+                except (smtplib.SMTPConnectError, ConnectionRefusedError, TimeoutError) as e:
+                    logger.warning(f"⚠️ SMTP Connection Error on port {smtp_port}: {e}. Retrying with SSL/465...")
                     # Fallback to 465 if 587 fails
-                    with smtplib.SMTP_SSL(smtp_host, 465, timeout=30) as server:
+                    with smtplib.SMTP_SSL(smtp_host, 465, timeout=60) as server:
                         server.login(smtp_user, smtp_pass)
                         server.send_message(msg)
                 
             logger.debug(f"📤 [SMTP SUCCESS] Message accepted by {smtp_host}")
             return {"status": "success", "message_id": f"smtp_{int(time.time())}"}
+        except TimeoutError:
+             logger.error(f"❌ [SMTP TIMEOUT] Connection to {smtp_host}:{smtp_port} timed out after 60s.")
+             raise Exception("SMTP Connection Timed Out")
         except Exception as e:
             logger.error(f"❌ [SMTP ERROR] Failed to send via {smtp_host}: {e}")
             raise Exception(f"SMTP Send Error: {e}")

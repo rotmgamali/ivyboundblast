@@ -182,23 +182,25 @@ class EmailScheduler:
                 inbox_email = None
                 # Slow but safe: fetch inbox list to find email. 
                 # Ideally, we cache this map too.
-                # For now, let's assume we can tolerate one API call? 
-                # No, better: The 'slots' generator already fetched inboxes. 
-                # But 'execute_slot' doesn't have that list.
-                # Let's do a quick lookup helper
                 inboxes = self.mailreef.get_inboxes()
                 for ibx in inboxes:
-                    if str(ibx['id']) == str(inbox_id):
-                        inbox_email = ibx['email']
+                    if str(ibx.get('id')) == str(inbox_id):
+                        # API might return 'email' or 'address'
+                        inbox_email = ibx.get('email') or ibx.get('address')
+                        # Fallback: construct from username@domain if available
+                        if not inbox_email and ibx.get('username') and ibx.get('domain'):
+                            inbox_email = f"{ibx['username']}@{ibx['domain']}"
                         break
                 
                 if inbox_email:
                     return self.sheets.get_leads_for_followup(sender_email=inbox_email, limit=count)
                 else:
-                    logger.warning(f"Could not resolve email for inbox ID {inbox_id}")
+                    logger.warning(f"Could not resolve email for inbox ID {inbox_id} (Data: {inboxes[0] if inboxes else 'Empty'})")
                     return []
             except Exception as e:
-                logger.error(f"Error fetching follow-ups: {e}")
+                logger.error(f"Error fetching follow-ups for inbox {inbox_id}: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
                 return []
 
         # Stage 1: New Leads (Use Cache)
