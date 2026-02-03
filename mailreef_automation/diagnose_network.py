@@ -64,7 +64,8 @@ def run_diagnostics():
             print(f"   Using API Key: {masked_key}")
             
             # Using the same auth as MailreefClient
-            r = requests.get(f"https://{api_host}/domains", auth=(api_key, ''), timeout=15)
+            # Endpoint requires 'page' parameter
+            r = requests.get(f"https://{api_host}/domains", params={"page": 1}, auth=(api_key, ''), timeout=15)
             if r.status_code == 200:
                 print("   ✅ API AUTH SUCCESS: Successfully fetched domains.")
             else:
