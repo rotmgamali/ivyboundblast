@@ -256,7 +256,12 @@ class EmailScheduler:
                 )
                 
                 subject = result['subject']
-                body_html = result['body'].replace('\n', '<br>')
+                body_text = result['body']
+                body_html = body_text.replace('\n', '<br>')
+                
+                # VERBOSE LOGGING FOR USER VISIBILITY
+                logger.info(f"📧 [EMAIL CONTENT] Subject: {subject}")
+                logger.info(f"--- BODY START ---\n{body_text}\n--- BODY END ---")
                 
                 response = self.mailreef.send_email(
                     inbox_id=inbox_id,
