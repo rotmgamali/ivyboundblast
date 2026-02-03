@@ -178,24 +178,26 @@ class EmailScheduler:
         # Must find a lead that was sent Email 1 by THIS inbox
         if sequence_stage == 2:
             try:
-                # Get sending email address for this inbox ID
-                inbox_email = None
-                # Slow but safe: fetch inbox list to find email. 
-                # Ideally, we cache this map too.
-                inboxes = self.mailreef.get_inboxes()
-                for ibx in inboxes:
-                    if str(ibx.get('id')) == str(inbox_id):
-                        # API might return 'email' or 'address'
-                        inbox_email = ibx.get('email') or ibx.get('address')
-                        # Fallback: construct from username@domain if available
-                        if not inbox_email and ibx.get('username') and ibx.get('domain'):
-                            inbox_email = f"{ibx['username']}@{ibx['domain']}"
-                        break
+                # Optimized: If inbox_id looks like an email, use it directly (saves API call & error prone lookup)
+                if '@' in str(inbox_id):
+                    inbox_email = str(inbox_id)
+                else:
+                    # Slow but safe: fetch inbox list to find email. 
+                    inbox_email = None
+                    inboxes = self.mailreef.get_inboxes()
+                    for ibx in inboxes:
+                        if str(ibx.get('id')) == str(inbox_id):
+                            # API might return 'email' or 'address'
+                            inbox_email = ibx.get('email') or ibx.get('address')
+                            # Fallback: construct from username@domain if available
+                            if not inbox_email and ibx.get('username') and ibx.get('domain'):
+                                inbox_email = f"{ibx['username']}@{ibx['domain']}"
+                            break
                 
                 if inbox_email:
                     return self.sheets.get_leads_for_followup(sender_email=inbox_email, limit=count)
                 else:
-                    logger.warning(f"Could not resolve email for inbox ID {inbox_id} (Data: {inboxes[0] if inboxes else 'Empty'})")
+                    logger.warning(f"Could not resolve email for inbox ID {inbox_id} (Data: {inboxes[0] if 'inboxes' in locals() and inboxes else 'Empty'})")
                     return []
             except Exception as e:
                 logger.error(f"Error fetching follow-ups for inbox {inbox_id}: {e}")

@@ -135,32 +135,61 @@ class MailreefClient:
 
         # 3. Send via SMTP (try SSL first if 465, else TLS)
         logger.debug(f"🔌 [SMTP CONNECT] Connecting to {smtp_host}:{smtp_port} for {inbox_id}...")
+        # 3. Send via SMTP (Prioritize 587/TLS, then 465/SSL)
+        # Note: 'errorskin' servers often support 587 with STARTTLS better, or 465 with implicit SSL.
+        # We will try 587 first as it aligns with modern standards, then fallback to 465.
+        
+        # Override initial port decision to force dynamic retry flow
+        primary_port = 587
+        secondary_port = 465
+        
+        # If creds explicitly specified 465, swap order
+        if smtp_port == 465:
+            primary_port = 465
+            secondary_port = 587
+            
         try:
-            if smtp_port == 465:
-                # Increased timeout to 60s for stability
-                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=60) as server:
+            # Attempt Primary Port
+            logger.debug(f"🔌 [SMTP CONNECT] Connecting to {smtp_host}:{primary_port} for {inbox_id}...")
+            if primary_port == 465:
+                # Implicit SSL
+                with smtplib.SMTP_SSL(smtp_host, primary_port, timeout=60) as server:
                     server.login(smtp_user, smtp_pass)
                     server.send_message(msg)
             else:
-                try:
-                    with smtplib.SMTP(smtp_host, smtp_port, timeout=60) as server:
+                # STARTTLS
+                with smtplib.SMTP(smtp_host, primary_port, timeout=60) as server:
+                    server.starttls()
+                    server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+                    
+            logger.debug(f"📤 [SMTP SUCCESS] Message accepted by {smtp_host} (Port {primary_port})")
+            return {"status": "success", "message_id": f"smtp_{int(time.time())}"}
+            
+        except (smtplib.SMTPConnectError, ConnectionRefusedError, TimeoutError, smtplib.SMTPServerDisconnected) as e1:
+            logger.warning(f"⚠️ SMTP Fail on port {primary_port}: {e1}. Retrying on {secondary_port}...")
+            
+            try:
+                # Attempt Secondary Port
+                if secondary_port == 465:
+                    with smtplib.SMTP_SSL(smtp_host, secondary_port, timeout=60) as server:
+                        server.login(smtp_user, smtp_pass)
+                        server.send_message(msg)
+                else:
+                    with smtplib.SMTP(smtp_host, secondary_port, timeout=60) as server:
                         server.starttls()
                         server.login(smtp_user, smtp_pass)
                         server.send_message(msg)
-                except (smtplib.SMTPConnectError, ConnectionRefusedError, TimeoutError) as e:
-                    logger.warning(f"⚠️ SMTP Connection Error on port {smtp_port}: {e}. Retrying with SSL/465...")
-                    # Fallback to 465 if 587 fails
-                    with smtplib.SMTP_SSL(smtp_host, 465, timeout=60) as server:
-                        server.login(smtp_user, smtp_pass)
-                        server.send_message(msg)
+                        
+                logger.debug(f"📤 [SMTP SUCCESS] Message accepted by {smtp_host} (Port {secondary_port})")
+                return {"status": "success", "message_id": f"smtp_{int(time.time())}"}
                 
-            logger.debug(f"📤 [SMTP SUCCESS] Message accepted by {smtp_host}")
-            return {"status": "success", "message_id": f"smtp_{int(time.time())}"}
-        except TimeoutError:
-             logger.error(f"❌ [SMTP TIMEOUT] Connection to {smtp_host}:{smtp_port} timed out after 60s.")
-             raise Exception("SMTP Connection Timed Out")
+            except Exception as e2:
+                logger.error(f"❌ [SMTP FINAL ERROR] Failed on both ports ({primary_port}, {secondary_port}). Last error: {e2}")
+                raise Exception(f"SMTP Failed: {e2}")
+        
         except Exception as e:
-            logger.error(f"❌ [SMTP ERROR] Failed to send via {smtp_host}: {e}")
+            logger.error(f"❌ [SMTP ERROR] Unexpected error via {smtp_host}: {e}")
             raise Exception(f"SMTP Send Error: {e}")
 
     def _get_cached_creds(self, inbox_id: str) -> Dict:
