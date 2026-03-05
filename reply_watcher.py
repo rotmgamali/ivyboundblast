@@ -249,6 +249,18 @@ class ReplyWatcher:
                     if self.is_warmup(from_email, subject):
                         continue
 
+                    # STRICT FILTER: Only allow campaign-specific subject lines
+                    reply_subject = subject.lower().replace('re:', '').replace('fwd:', '').strip()
+                    known_fragments = [
+                        "quick question", "supporting families", "boosting enrollment", 
+                        "academic outcomes", "differentiation", "merit scholarship",
+                        "college readiness", "student-athletes", "test prep", 
+                        "enhancing value", "families and college prep"
+                    ]
+                    if not any(frag in reply_subject for frag in known_fragments):
+                        logger.debug(f"⏭️ [SKIP] Subject did not match known campaign fragments: {subject}")
+                        continue
+
                     # FILTER: Skip if not for this campaign's inboxes
                     to_email = msg.get("to")[0] if msg.get("to") else "unknown"
                     if self.campaign_inboxes and to_email.lower().strip() not in self.campaign_inboxes:

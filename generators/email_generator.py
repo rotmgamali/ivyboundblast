@@ -12,30 +12,27 @@ import pytz
 # Suppress SSL warnings from scraper to keep logs clean
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import re
+from mailreef_automation.logger_util import get_logger
 
 # Add project root to path to allow imports from sibling directories
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(BASE_DIR))
 
-from logger_util import get_logger
 load_dotenv()
-logger = get_logger("EMAIL_GENERATOR")
+_logger = get_logger("EMAIL_GENERATOR")
 
-# Try to import the scraper, fallback if missing
+# Try to import scrapers
 try:
-    # First attempt: Root-relative import (Standard for our Docker setup)
     import automation_scrapers.school_scraper as school_scraper
-    scrape_website_text = school_scraper.scrape_website_text
-    logger.info("✓ Successfully imported school_scraper")
-except ImportError as e:
-    try:
-        # Second attempt: Direct import (if path already adjusted)
-        from automation_scrapers.school_scraper import scrape_website_text
-        logger.info("✓ Successfully imported school_scraper via fallback")
-    except ImportError:
-        logging.warning(f"⚠️ Could not import school_scraper: {e}")
-        logging.warning(f"🔍 sys.path currently includes: {sys.path[:3]}...")
-        scrape_website_text = None
+    _logger.info("✓ Successfully imported school_scraper")
+except ImportError:
+    school_scraper = None
+
+try:
+    import automation_scrapers.b2b_scraper as b2b_scraper
+    _logger.info("✓ Successfully imported b2b_scraper")
+except ImportError:
+    b2b_scraper = None
 
 class EmailGenerator:
     """
@@ -55,11 +52,31 @@ class EmailGenerator:
         "admissions": ["admission", "enrollment", "registrar"]
     }
 
-    LEGACY_PROMPTS = {}
-
-    def __init__(self, client=None):
+    def __init__(self, client=None, templates_dir="templates", log_file="automation.log", archetypes: dict = None):
         self.client = client or OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.templates_dir = BASE_DIR / "templates"
+        # Support both 'templates' (relative to root) and absolute paths
+        if os.path.isabs(templates_dir):
+            self.templates_dir = Path(templates_dir)
+        else:
+            self.templates_dir = BASE_DIR / templates_dir
+            
+        # Dynamically load archetypes, default to school ones if not provided
+        self.archetypes = archetypes or {
+            "principal": ["principal", "assistant principal", "vice principal"],
+            "head_of_school": ["head of school", "headmaster", "headmistress", "head of", "president", "superintendent"],
+            "academic_dean": ["dean", "academic", "curriculum", "instruction"],
+            "college_counseling": ["counselor", "college", "guidance", "advisor"],
+            "business_manager": ["business", "finance", "cfo", "bursar", "operations"],
+            "faith_leader": ["pastor", "minister", "chaplain", "campus ministry", "religious", "father", "reverend"],
+            "athletics": ["athletic", "coach", "sports", "physical education"],
+            "admissions": ["admission", "enrollment", "registrar"]
+        }
+            
+            
+        # --- LOGGING ISOLATION ---
+        self.logger = get_logger("EMAIL_GENERATOR", log_file)
+        # Avoid removing handlers from a shared logger name if we can avoid it, 
+        # but if we must isolate, we do it in self.logger
 
     def generate_email(
         self,
@@ -71,15 +88,15 @@ class EmailGenerator:
     ) -> dict:
         """
         Routing method:
-        - If 'school', use the new Archetype + Scraper logic.
+        - If 'school' or 'b2b', use the Archetype + Scraper logic.
         - Otherwise, use legacy dictionary prompts.
         """
-        if campaign_type == "school":
-            return self._generate_school_email(sequence_number, lead_data, enrichment_data, sender_email)
+        if campaign_type in ["school", "b2b"]:
+            return self._generate_templated_email(campaign_type, sequence_number, lead_data, enrichment_data, sender_email)
         else:
             return self._generate_legacy_email(campaign_type, sequence_number, lead_data, enrichment_data)
 
-    def _generate_school_email(self, sequence_number: int, lead_data: dict, enrichment_data: dict, sender_email: str = None) -> dict:
+    def _generate_templated_email(self, campaign_type: str, sequence_number: int, lead_data: dict, enrichment_data: dict, sender_email: str = None) -> dict:
         """
         1. Identify Archetype (Role).
         2. Load Template (file).
@@ -88,66 +105,98 @@ class EmailGenerator:
         """
         role = (lead_data.get("role") or "").lower()
         archetype = self._get_archetype(role)
-        logger.info(f"🎯 [GEN] Archetype: {archetype} (detected from role: '{role}')")
+        _logger.info(f"🎯 [GEN] {campaign_type.upper()} Archetype: {archetype} (detected from role: '{role}')")
         
         # Load Template
-        template_content = self._load_template_file(archetype, sequence_number)
+        template_content = self._load_template_file(campaign_type, archetype, sequence_number)
         
         # Fallback to general if not found and archetype isn't already general
         if not template_content and archetype != "general":
-            logger.info(f"ℹ️ Template for {archetype}/{sequence_number} not found. Falling back to general.")
-            template_content = self._load_template_file("general", sequence_number)
+            _logger.info(f"ℹ️ Template for {archetype}/{sequence_number} not found. Falling back to general.")
+            template_content = self._load_template_file(campaign_type, "general", sequence_number)
             
         if not template_content:
-            logger.error(f"❌ Template missing for {archetype}/{sequence_number} and fallback general failed.")
-            return {"subject": "Quick question", "body": "I'd love to connect regarding SAT/ACT prep at your school."}
+            _logger.error(f"❌ Template missing for {campaign_type}/{archetype}/{sequence_number} and fallback general failed.")
+            return {"subject": "Quick question", "body": "I'd love to connect regarding your current operations."}
 
         # Website Scraping
         website_content = enrichment_data.get("website_content", "")
-        url = lead_data.get("domain") or lead_data.get("website")
+        url = lead_data.get("website") or lead_data.get("domain")
 
-        if not website_content and url and scrape_website_text:
-            logger.info(f"🌍 [SCRAPE] Attempting to scrape: {url}...")
-            try:
-                if not url.startswith("http"):
-                    url = "https://" + url
-                website_content = scrape_website_text(url)
-                if website_content and len(website_content) > 100:
-                    logger.info(f"✅ [SCRAPE SUCCESS] Found {len(website_content)} characters for personalization.")
-                else:
-                    logger.warning(f"⚠️ [SCRAPE WEAK] Only found {len(website_content) if website_content else 0} chars. Personalization may be generic.")
-            except Exception as e:
-                logger.error(f"❌ [SCRAPE ERROR] Failed for {url}: {e}")
-                website_content = "No website content available."
-        elif not url:
-            logger.warning(f"⚠️ [SCRAPE SKIP] No 'domain' or 'website' found in lead data for {lead_data.get('email')}.")
+        if not website_content and url:
+            # SANITY CHECK: Ensure we aren't scraping Google Maps
+            if "google.com" in url.lower() or "goo.gl" in url.lower():
+                self.logger.warning(f"⚠️ Skipping scrape for Google URL: {url}")
+                website_content = "Scraper skipped for Google URL."
+            else:
+                self.logger.info(f"🌍 [SCRAPE] Attempting to scrape {campaign_type} site: {url}...")
+                try:
+                    if not url.startswith("http"):
+                        url = "https://" + url
+                    
+                    # Choose the right scraper
+                    if campaign_type == "b2b" and b2b_scraper:
+                        website_content = b2b_scraper.scrape_b2b_text(url)
+                    elif school_scraper:
+                        website_content = school_scraper.scrape_website_text(url)
+                    else:
+                        website_content = "Scraper unavailable."
+
+                    if website_content and len(website_content) > 100:
+                        self.logger.info(f"✅ [SCRAPE SUCCESS] Found {len(website_content)} characters for personalization.")
+                    else:
+                        self.logger.warning(f"⚠️ [SCRAPE WEAK] Only found {len(website_content) if website_content else 0} chars.")
+                except Exception as e:
+                    self.logger.error(f"❌ [SCRAPE ERROR] Failed for {url}: {e}")
+                    website_content = "No website content available."
         
+        # Parse Custom Data
+        custom_json = lead_data.get("custom_data", "{}")
+        custom_context = ""
+        try:
+            if isinstance(custom_json, str) and custom_json.strip():
+                import json
+                data = json.loads(custom_json)
+                
+                # Extract valuable fields
+                desc = data.get("company_insights.description") or data.get("description") or ""
+                year = data.get("company_insights.founded_year") or data.get("founded_year")
+                reviews = data.get("reviews")
+                rating = data.get("rating")
+                city = data.get("city") or data.get("company_insights.city")
+                
+                context_parts = []
+                if desc: context_parts.append(f"Business Description: {desc}")
+                if year: context_parts.append(f"Founded: {year}")
+                if reviews and rating: context_parts.append(f"Reputation: {rating} stars from {reviews} reviews")
+                if city: context_parts.append(f"Location: {city}")
+                
+                if context_parts:
+                    custom_context = "\n".join(context_parts)
+                    self.logger.info(f"✅ [DATA] Extracted rich personalization details: {len(context_parts)} items.")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Failed to parse custom_data: {e}")
+
         # Build Prompts (System + User)
-        # UPDATE: Now returns envelope data (greeting, sign_off)
-        system_prompt, user_prompt, envelope = self._prepare_school_prompts(
-            template_content, lead_data, website_content, sequence_number, sender_email
+        system_prompt, user_prompt, envelope = self._prepare_templated_prompts(
+            campaign_type, template_content, lead_data, website_content, sequence_number, sender_email, custom_context
         )
         
         # Call LLM for Body & Subject
         llm_result = self._call_llm(user_prompt, system_prompt)
         
-        # --- ENVELOPE REASSEMBLY (The Fix) ---
-        # We stitch the deterministic Python parts with the AI creative parts.
-        
-        # 1. Clean AI Body (Strip ANY greeting/sign-off hallucinated by AI)
+        # --- ENVELOPE REASSEMBLY ---
         clean_body = self._strip_hallucinations(llm_result['body'], envelope['greeting'], envelope['sign_off'])
-        
-        # 2. Assemble Final Email
         final_body = f"{envelope['greeting']}\n\n{clean_body}\n\n{envelope['sign_off']}"
         
         return {
-            "subject": llm_result['subject'],
+            "subject": envelope['subject'],
             "body": final_body
         }
 
     def _get_archetype(self, role: str) -> str:
         """Map job title to archetype folder name."""
-        for key, keywords in self.ARCHETYPES.items():
+        for key, keywords in self.archetypes.items():
             if any(k in role for k in keywords):
                 return key
         return "general"  # Default
@@ -158,9 +207,13 @@ class EmailGenerator:
         name = name.strip()
         lower_name = name.lower()
         
-        # Blocklist
-        blocklist = ["info", "admin", "office", "contact", "admissions", "principal", "head", "school"]
-        if lower_name in blocklist:
+        # Blocklist (expanded to catch common placeholder terms)
+        blocklist = [
+            "info", "admin", "administrator", "office", "contact", 
+            "admissions", "principal", "head", "school", "manager",
+            "leader", "team", "coordinator", "assistant", "staff"
+        ]
+        if any(term in lower_name for term in blocklist):
             return ""
             
         # Check against School Name
@@ -174,6 +227,9 @@ class EmailGenerator:
             if lower_name == school_name:
                 return ""
                 
+        # Strip trailing punctuation (common in "Last, First" data)
+        name = name.rstrip(",. ")
+        
         return name
 
     def _get_time_greeting(self) -> str:
@@ -192,30 +248,32 @@ class EmailGenerator:
         except Exception:
             return "Good day"
 
-    def _load_template_file(self, archetype: str, sequence_number: int) -> Optional[str]:
+    def _load_template_file(self, campaign_type: str, archetype: str, sequence_number: int) -> Optional[str]:
         """Read template file from disk (e.g. templates/school/principal/email_1.txt)."""
         # Map sequence number to file name (email_1.txt)
         filename = f"email_{sequence_number}.txt"
-        path = self.templates_dir / "school" / archetype / filename
+        path = self.templates_dir / campaign_type / archetype / filename
         
-        logger.debug(f"🔍 [PATH CHECK] Looking for template at: {path}")
+        _logger.debug(f"🔍 [PATH CHECK] Looking for template at: {path}")
         
         if path.exists():
-            return path.read_text(encoding="utf-8")
+            content = path.read_text(encoding="utf-8")
+            self.logger.info(f"📄 [TEMPLATE CONTENT PREVIEW] {content[:100]}...")
+            return content
         
         # Diagnostic: List files to see what's actually there
         try:
             if self.templates_dir.exists():
                 contents = os.listdir(self.templates_dir)
-                logger.debug(f"📁 [DIR LIST] Content of {self.templates_dir}: {contents}")
+                self.logger.debug(f"📁 [DIR LIST] Content of {self.templates_dir}: {contents}")
             else:
-                logger.error(f"🚨 [DIR MISSING] Template directory NOT FOUND at {self.templates_dir}")
+                self.logger.error(f"🚨 [DIR MISSING] Template directory NOT FOUND at {self.templates_dir}")
         except Exception as e:
-            logger.debug(f"🔍 [DIR ERROR] Could not list directory: {e}")
+            self.logger.debug(f"🔍 [DIR ERROR] Could not list directory: {e}")
             
         return None
 
-    def _prepare_school_prompts(self, template_content: str, lead_data: dict, website_content: str, sequence_number: int, sender_email: str) -> tuple:
+    def _prepare_templated_prompts(self, campaign_type: str, template_content: str, lead_data: dict, website_content: str, sequence_number: int, sender_email: str, custom_context: str = "") -> tuple:
         """
         Constructs (system_message, user_message, envelope_dict).
         Implements the ENVELOPE PATTERN: 
@@ -225,6 +283,20 @@ class EmailGenerator:
         """
         
         # --- 1. Calculate Variables (Identity & Recipient) ---
+        
+        # Name & Greeting Logic
+        raw_name = lead_data.get("first_name", "")
+        # ... (retained logic) ...
+        # (This tool call needs to be precise so I don't delete the whole body. Let's act on the signature first)
+        
+        # (Actually, I need to jump down to where user_prompt is constructed to inject custom_context)
+        # Let's do this in two chunks if needed, or target the prompt construction block.
+        pass
+
+    # I will split this into two calls for safety. First the signature.
+    # Wait, I can't use `pass` in replacement. I need to be exact.
+    # I will target the signature line specifically.
+
         
         # Name & Greeting Logic
         raw_name = lead_data.get("first_name", "")
@@ -261,84 +333,78 @@ class EmailGenerator:
         draft_body = template_content
         
         # Strategy: Pre-fill ALL known variables in the template so the LLM sees clean text.
-        school_name = lead_data.get("school_name", "your school")
+        school_name = lead_data.get("school_name") or lead_data.get("company_name") or "your company"
+        school_type = lead_data.get("school_type", "private").lower()
+        
         replacements = {
             "first_name": first_name,
             "school_name": school_name,
+            "company_name": school_name, # Alias for B2B
             "city": lead_data.get("city", "your city"),
             "state": lead_data.get("state", ""),
-            "role": lead_data.get("role", "educator")
+            "role": lead_data.get("role", "executive"),
+            "greeting": greeting_line # Expose the calculated greeting (e.g. "Good morning," or "Hi Andrew,")
         }
         
-        # 1. Handle the Greeting specifically (remove "Hi " from template if we have a full greeting line)
-        # If template has "Hi {{ first_name }}," -> replace with "Hi Andrew," (or "Good morning,")
-        # But wait, greeting_line ALREADY contains "Hi " or "Good morning".
-        # So we should replace "Hi {{ first_name }}" with greeting_line WITHOUT the trailing comma if possible, 
-        # or just rely on the fact that greeting_line usually ends in comma? 
-        # Actually my code computes `greeting_line = "Hi Andrew,"` (with comma).
+        # 1. Replace Greeting Variable
+        # Template uses {{ greeting }}
+        # Logic: Replace "{{ greeting }}" with the computed line and ensures no double punctuation
+        if "{{ greeting }}" in draft_body:
+            draft_body = draft_body.replace("{{ greeting }}", greeting_line)
         
-        # Let's try to match "Hi {{ first_name }}," or "Hi {{ first_name }}"
-        # Case A: Time based "Good morning,". We want to nuke the "Hi" in the template.
-        
-        # Robust Regex for Greeting:
-        # Match "Hi" (optional), whitespace, {{ first_name }}, comma(optional)
-        greeting_pattern = re.compile(r'(Hi\s*)?\{\{\s*first_name\s*\}\},?', re.IGNORECASE)
-        
-        # Check if we find it
-        if greeting_pattern.search(draft_body):
-            draft_body = greeting_pattern.sub(greeting_line, draft_body)
-        else:
-             # Fallback: Just simple variable replace if pattern doesn't match
-             draft_body = re.sub(r'\{\{\s*first_name\s*\}\}', first_name, draft_body)
-
         # 2. Replace other variables (school_name, etc)
         for key, val in replacements.items():
-            if key == "first_name": continue # Already handled
+            if key == "greeting": continue # Already handled
             pattern = re.compile(r'\{\{\s*' + key + r'\s*\}\}', re.IGNORECASE)
             draft_body = pattern.sub(str(val), draft_body)
              
-        # Double check: ensure the greeting is at the top if replacement failed (e.g. template diff)
-        # But for now, assume template compliance. 
-        
         # --- 3. Template Stripping (The Cleaning) ---
-        # We need to give the AI only the BODY of the template.
-        # Logic: 
-        # 1. Identify Greeting (regex match for Hi/Dear/Good... ,)
-        # 2. Identify Sign-off (regex match for Best/Sincerely/SenderName)
-        # 3. Remove them.
+        # We need to give the AI only the BODY text to transform.
+        # We must strip the Subject line and the Greeting line.
         
-        # We use the regex-substituted 'draft_body' which already has 'Hi Andrew,' inside.
+        # Extract and save the exact Subject line from the template before stripping it
+        subject_match = re.search(r'(?i)^Subject:\s*(.*)', draft_body)
+        template_subject = subject_match.group(1).strip() if subject_match else "Quick question"
+
+        # Remove Subject line
+        clean_draft = re.sub(r'(?i)^Subject:.*?\n+', '', draft_body).strip()
         
-        # Strip Greeting (Start of string)
-        # Matches: "Hi Andrew," or "Good morning," followed by newlines
-        clean_draft = re.sub(r'^\s*(?:Hi|Dear|Good|Hello).*?,\s*\n+', '', draft_body, flags=re.IGNORECASE|re.MULTILINE)
+        # Remove Greeting line (e.g. "Hi Andrew," or "Good morning,")
+        # Matches a greeting at the very start of the (now subject-less) draft
+        clean_draft = re.sub(r'^(?i)(?:Hi|Dear|Good|Hello).*?,\s*\n+', '', clean_draft).strip()
         
-        # Strip Sign-off (End of string)
-        # Matches: "Best,\nMark..." or just "Mark" at end
-        # We aggressively cut anything after "Best," or "Sincerely," or the sender name.
-        # Note: This is heuristic.
+        # Strip Sign-off from bottom of draft
+        # Markers: Best, Sincerely, etc. or the sender's own name
         for marker in ["Best,", "Sincerely,", "Warmly,", "Cheers,", "Thanks,", sender_name]:
              if marker in clean_draft:
-                  clean_draft = clean_draft.split(marker)[0].strip()
+                  # Take only what's before the last occurrence of the marker to be safe
+                  parts = clean_draft.rsplit(marker, 1)
+                  clean_draft = parts[0].strip()
         
         # --- 4. Envelope Definition ---
         # Define the deterministic shell
         sign_off_block = f"Best,\n{sender_name}"
         envelope = {
             "greeting": greeting_line,
-            "sign_off": sign_off_block
+            "sign_off": sign_off_block,
+            "subject": template_subject
         }
         
         # --- 5. System Prompt (Constraint) ---
         system_prompt = f"""You are {sender_name}, a helpful consultant.
         
 STYLE GUIDE:
-- Tone: Human, warm, brief.
-- formatting: paragraphs only.
+- Tone: Human, warm, brief, and professional.
+- Formatting: Use paragraphs only.
 - Absolute Rules:
   1. DO NOT include a greeting (e.g. "Hi...").
   2. DO NOT include a sign-off (e.g. "Best, Mark").
   3. OUTPUT ONLY the Subject and the Body paragraphs.
+
+CONTEXT:
+This is a {school_type} school.
+- IF PUBLIC: Focus on district alignment, budget efficiency, and improving standardized test scores.
+- IF PRIVATE: Focus on enrollment, prestige, and college matriculation.
 """
 
         # --- 6. User Prompt (Body Generation) ---
@@ -349,33 +415,54 @@ DRAFT CONTENT:
 {clean_draft}
 '''
 
-RESEARCH HIGHLIGHTS:
+LEAD CONTEXT (Use this to personalize!):
+{custom_context}
+
+RESEARCH HIGHLIGHTS (Web Scrape):
 {website_content[:3000]}
 
 TASK:
-Rewrite the DRAFT CONTENT to make it feel personal.
-- Weave in 1 detail from RESEARCH HIGHLIGHTS if relevant.
-- write ONLY the body paragraphs.
-- Output format:
-SUBJECT: [Subject]
+Rewrite the DRAFT CONTENT to make it feel personal and handwritten.
+- Use the LEAD CONTEXT (Founded year, specific description, city, etc.) to show you've done your homework.
+- REPUTATION GUIDELINE: If mentioned, be positive or supportive. Never be critical of their reviews; instead, mention how much you appreciate their commitment to the community.
+- write ONLY the body paragraphs. 
+- NO GREETINGS (Hi..., Good morning...).
+- NO SIGN-OFFS (Best..., Andrew...).
+- Keep it under 100 words.
+
+Output format:
+SUBJECT: [Personalized Subject]
 BODY: [Paragraph 1]
-[Paragraph 2]...
+[Paragraph 2]
 """
         return system_prompt, user_prompt, envelope
 
     def _strip_hallucinations(self, body_text: str, greeting: str, sign_off: str) -> str:
-        """Failsafe: If AI wrote 'Hi Andrew,' anyway, remove it."""
-        # Clean Start
-        cleaned = re.sub(r'^\s*(?:Hi|Dear|Good|Hello).*?,\s*\n+', '', body_text, flags=re.IGNORECASE|re.MULTILINE)
-        # Clean End (Sign-off)
-        # Remove "Best," etc if strictly at end
-        cleaned = re.sub(r'\n\s*(?:Best|Sincerely|Warmly|Cheers|Thanks).*?$', '', cleaned, flags=re.IGNORECASE|re.DOTALL)
-        # Remove Name if at end
-        cleaned = re.sub(r'\n\s*Mark.*?$', '', cleaned, flags=re.IGNORECASE|re.DOTALL)
-        cleaned = re.sub(r'\n\s*Genelle.*?$', '', cleaned, flags=re.IGNORECASE|re.DOTALL)
-        cleaned = re.sub(r'\n\s*Andrew.*?$', '', cleaned, flags=re.IGNORECASE|re.DOTALL)
+        """Failsafe: If AI wrote 'Hi Andrew,' or 'Best, Name' anyway, remove it."""
+        lines = body_text.split("\n")
         
-        return cleaned.strip()
+        # 1. Strip Leading Greeting
+        if lines and any(g.lower() in lines[0].lower() for g in ["hi", "dear", "good morning", "good afternoon", "good evening", "hello"]):
+            if "," in lines[0]:
+                lines = lines[1:]
+                
+        # 2. Strip Trailing Sign-off
+        # Check last 2-3 lines for sign-off markers
+        while lines and not lines[-1].strip(): lines.pop() # Remove trailing empty
+        
+        if lines:
+            last_line = lines[-1].strip().lower()
+            # If last line is just a name or a common sign-off
+            markers = ["best", "sincerely", "warmly", "cheers", "thanks", "regards", "andrew", "genelle", "mark"]
+            if any(last_line == m or last_line.startswith(f"{m},") for m in markers):
+                lines.pop()
+                # Check one more line up for the "Best," part if it was "Best,\nName"
+                if lines:
+                    new_last = lines[-1].strip().lower()
+                    if any(new_last == m or new_last.startswith(f"{m},") for m in markers):
+                        lines.pop()
+
+        return "\n".join(lines).strip()
 
     def _generate_legacy_email(self, campaign_type: str, sequence_number: int, lead_data: dict, enrichment_data: dict) -> dict:
         """Fallback for non-school campaigns."""
@@ -397,10 +484,10 @@ BODY: [Paragraph 1]
         result = self._call_llm(prompt)
         
         # Obsessive Content Audit
-        logger.info(f"✍️  [CONTENT GEN] Generated copy for {lead_data.get('email')}")
-        logger.info(f"   Subject: {result['subject']}")
+        self.logger.info(f"✍️  [CONTENT GEN] Generated copy for {lead_data.get('email')}")
+        self.logger.info(f"   Subject: {result['subject']}")
         body_preview = result['body'].replace('\n', ' ')[:100] + "..."
-        logger.info(f"   Body Preview: {body_preview}")
+        self.logger.info(f"   Body Preview: {body_preview}")
         
         return result
 
@@ -418,7 +505,7 @@ BODY: [Paragraph 1]
             )
             return self._parse_response(response.choices[0].message.content)
         except Exception as e:
-            logger.error(f"OpenAI Error: {e}")
+            self.logger.error(f"OpenAI Error: {e}")
             return {"subject": "Error", "body": str(e)}
 
     def _parse_response(self, content: str) -> dict:
