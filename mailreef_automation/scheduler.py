@@ -455,12 +455,19 @@ class EmailScheduler:
     
     def _execute_slot(self, inbox_id, scheduled_time):
         """Execute a single send slot with sequence prioritization"""
-        # Prioritize Follow-ups (Stage 2) first
-        prospects = self.select_prospects_for_send(inbox_id, count=1, sequence_stage=2)
-        stage = 2
+        # Check if follow-ups are enabled (sequence_length > 1)
+        seq_len = self.config.CAMPAIGN_CONFIG.get("sequence_length", 2)
+        
+        prospects = None
+        stage = 1
+        
+        if seq_len > 1:
+            # Prioritize Follow-ups (Stage 2) first
+            prospects = self.select_prospects_for_send(inbox_id, count=1, sequence_stage=2)
+            stage = 2
         
         if not prospects:
-            # If no follow-ups due, pick a new Stage 1 lead
+            # Pick a new Stage 1 lead (or the only stage when sequence_length=1)
             prospects = self.select_prospects_for_send(inbox_id, count=1, sequence_stage=1)
             stage = 1
         
