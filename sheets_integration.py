@@ -228,6 +228,12 @@ class GoogleSheetsClient:
         try:
             self.input_sheet = self.client.open(self.input_sheet_name)
             logger.info(f"✓ Found existing input sheet: {self.input_sheet_name}")
+            
+            # HARDENING: Check if empty and add headers
+            worksheet = self.input_sheet.sheet1
+            if not worksheet.get_all_values():
+                logger.info("Sheet is empty. Adding headers...")
+                self._setup_input_sheet_headers()
         except gspread.SpreadsheetNotFound:
             self.input_sheet = self.client.create(self.input_sheet_name)
             self._setup_input_sheet_headers()
