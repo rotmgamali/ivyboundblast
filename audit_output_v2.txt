@@ -1,0 +1,45 @@
+2026-02-09 21:47:58,952 - sheets_integration - INFO - ✓ Authenticated via local token file
+2026-02-09 21:47:58,953 - sheets_integration - INFO - ✓ Final Authentication Successful
+2026-02-09 21:47:59,823 - sheets_integration - INFO - ✓ Found existing input sheet: Ivy Bound - Campaign Leads
+2026-02-09 21:48:00,595 - sheets_integration - INFO - ✓ Found existing replies sheet: Ivy Bound - Reply Tracking
+2026-02-09 21:48:00,595 - sheets_integration - INFO - 📡 Fetching fresh records from Google Sheets...
+🚀 Starting Comprehensive Campaign Performance Audit...
+📡 Fetching lead records from Google Sheets...
+✅ Total Leads in Sheet: 12846
+✅ Leads with Sent Status: 11414
+✅ Leads marked as 'Replied': 53
+📡 Fetching ALL inbound messages from Mailreef (this may take a moment)...
+  - Loaded 100 messages...  - Loaded 200 messages...  - Loaded 300 messages...  - Loaded 400 messages...  - Loaded 500 messages...  - Loaded 600 messages...  - Loaded 700 messages...  - Loaded 800 messages...  - Loaded 900 messages...  - Loaded 1000 messages...  - Loaded 1100 messages...
+✅ Total Inbound Messages Found: 1128
+
+--- PERFORMANCE SUMMARY ---
+Total Unique Leads Contacted: 11414
+Total Unique School Replies Identified: 80
+Total Bounces Detected in Inbound: 15
+-------------------------------
+📊 Overall Reply Rate: 0.70%
+📊 Observed Bounce Rate: 0.13%
+-------------------------------
+Warmup noise filtered: 52
+
+--- TOP RECENT CONFIRMED REPLIES ---
+  [EXACT] sdhager@forneyisd.net | Re: Quick question about North Forney High School
+  [EXACT] advclublearning@gmail.com | Re: Supporting families at Adventure Club Learning Center
+  [EXACT] kelly.lawrence@palmbeachschools.org | Re: Supporting families at Olympic Heights Community High School
+  [EXACT] hatth82@gmail.com | Re: Supporting families at Ivy Global School
+  [EXACT] admissions@mydreamsacademy.org | Your Inquiry
+  [EXACT] jonathanrobertson@sudanisd.net | Re: Quick question about Sudan High School
+  [FRAGMENT] mary@woodlandministries.com | Re: Quick question about Woodland Fine Arts Academy
+  [EXACT] fedamorton@gmail.com | Re: Quick question about Fluvanna County High School
+  [EXACT] leonschram@johnpauliihs.org | Re: Quick question about John Paul II High School
+  [EXACT] mmsbscarb@gmail.com | Re: Quick question about Winnsboro High School
+  [EXACT] rhooker.broady@gmail.com | Re: Quick question about Emma Lee Broady Academy
+  [EXACT] vrodriguez@rpsacademies.com | Re: Quick question about RPS Academies athletics
+  [EXACT] attendance@naplesclassical.org | Re: Quick question about Naples Classical Academy
+  [FRAGMENT] support@planningcenter.com | Re: Quick question about Gracepointe Church & Academy
+  [EXACT] mark@elizabethfarrellmusic.com | Re: Quick question about Elizabeth Farrell Music - South Sarasota
+  [EXACT] fly@patriotpilotacademy.com | Re: Quick question about Patriot Pilot Academy
+  [EXACT] info@brightbridgepreparatory.com | Re: Quick question about Bright Bridge Preparatory
+  [FRAGMENT] jhiggs@thecovenantschool.org | Re: Quick question about The Covenant School
+  [EXACT] eumana@standrewsmiami.org | Re: Quick question about St. Andrew's Preschool
+  [EXACT] mgines@rsavioracademy.com | Re: Quick question about Risen Savior Academy at Lakewood Ranch

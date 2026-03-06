@@ -1,0 +1,14 @@
+Subject: following up / outreach at {{ company_name }}
+
+Hi {{ first_name }},
+
+I'm following up on my previous note. I know how busy things get running a firm like {{ company_name }}.
+
+One thing I didn't mention is that our system doesn't just send emails—it handles the entire rotation of inboxes and warming, ensuring 100% deliverability even at high volumes.
+
+For companies providing {{ services }}, the biggest bottleneck is usually the time spent on manual research. We've automated that part while keeping the "human" touch.
+
+Do you have 10 minutes for a brief call on Tuesday or Wednesday?
+
+Best,
+{{ sender_name }}

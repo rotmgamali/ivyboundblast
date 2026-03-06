@@ -1,7 +1,7 @@
 from sheets_integration import GoogleSheetsClient
 import json
 
-SHEET_NAME = "Ivy Bound - High & Middle Schools (Validated)"
+SHEET_NAME = "Ivy Bound - Campaign Leads"
 
 def inspect_headers():
     print(f"Opening '{SHEET_NAME}'...")

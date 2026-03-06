@@ -1,0 +1,14 @@
+Subject: scaling outreach for {{ company_name }}
+
+Hi {{ first_name }},
+
+I was checking out {{ company_name }} and noticed your solutions in {{ services }}.
+
+We're currently using our own automation to reach out to you right now—it's a system designed to help B2B companies scale their personalized outreach without hiring a massive SDR team.
+
+We scrape prospects' sites in real-time to mention specific details like {{ about }} or your work with {{ clients }}. This ensures your emails actually get read.
+
+Would you be interested in seeing how this could work for {{ company_name }}?
+
+Cheers,
+{{ sender_name }}

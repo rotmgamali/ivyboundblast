@@ -1,0 +1,388 @@
+2026-02-09 21:52:49,426 - sheets_integration - INFO - ✓ Authenticated via local token file
+2026-02-09 21:52:49,427 - sheets_integration - INFO - ✓ Final Authentication Successful
+2026-02-09 21:52:50,451 - sheets_integration - INFO - ✓ Found existing input sheet: Ivy Bound - Campaign Leads
+2026-02-09 21:52:51,202 - sheets_integration - INFO - ✓ Found existing replies sheet: Ivy Bound - Reply Tracking
+2026-02-09 21:52:51,202 - sheets_integration - INFO - 📡 Fetching fresh records from Google Sheets...
+2026-02-09 21:53:09,961 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for sdhager@forneyisd.net: North Forney High School / Administrator
+2026-02-09 21:53:10,501 - sheets_integration - INFO - Logged reply from sdhager@forneyisd.net
+2026-02-09 21:53:11,340 - sheets_integration - INFO - Updated sdhager@forneyisd.net status to replied (Batch)
+2026-02-09 21:53:12,732 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for advclublearning@gmail.com: Adventure Club Learning Center / Preschool
+2026-02-09 21:53:13,299 - sheets_integration - INFO - Logged reply from advclublearning@gmail.com
+2026-02-09 21:53:13,957 - sheets_integration - INFO - Updated advclublearning@gmail.com status to replied (Batch)
+2026-02-09 21:53:15,393 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated postmaster@cfl.rr.com with lead perrinec@cfl.rr.com via domain cfl.rr.com
+2026-02-09 21:53:15,393 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for postmaster@cfl.rr.com: Einstein Academy / Private educational institution
+2026-02-09 21:53:16,010 - sheets_integration - INFO - Logged reply from postmaster@cfl.rr.com
+2026-02-09 21:53:16,723 - sheets_integration - INFO - Updated perrinec@cfl.rr.com status to replied (Batch)
+2026-02-09 21:53:17,953 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for kelly.lawrence@palmbeachschools.org: Olympic Heights Community High School / High school
+2026-02-09 21:53:18,565 - sheets_integration - INFO - Logged reply from kelly.lawrence@palmbeachschools.org
+2026-02-09 21:53:19,177 - sheets_integration - INFO - Updated kelly.lawrence@palmbeachschools.org status to replied (Batch)
+2026-02-09 21:53:20,427 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for hatth82@gmail.com: Ivy Global School / High school
+2026-02-09 21:53:20,953 - sheets_integration - INFO - Logged reply from hatth82@gmail.com
+2026-02-09 21:53:21,639 - sheets_integration - INFO - Updated hatth82@gmail.com status to replied (Batch)
+2026-02-09 21:53:22,872 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for admissions@mydreamsacademy.org: My Dreams Academy / Administrator
+2026-02-09 21:53:23,362 - sheets_integration - INFO - Logged reply from admissions@mydreamsacademy.org
+2026-02-09 21:53:24,103 - sheets_integration - INFO - Updated admissions@mydreamsacademy.org status to replied (Batch)
+2026-02-09 21:53:25,343 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for jonathanrobertson@sudanisd.net: Sudan High School / Administrator
+2026-02-09 21:53:25,876 - sheets_integration - INFO - Logged reply from jonathanrobertson@sudanisd.net
+2026-02-09 21:53:26,390 - sheets_integration - INFO - Updated jonathanrobertson@sudanisd.net status to replied (Batch)
+2026-02-09 21:53:28,161 - sheets_integration - INFO - Logged reply from mary@woodlandministries.com
+2026-02-09 21:53:29,633 - sheets_integration - WARNING - Lead not found in sheet: mary@woodlandministries.com
+2026-02-09 21:53:30,887 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for fedamorton@gmail.com: Fluvanna County High School / Administrator
+2026-02-09 21:53:31,438 - sheets_integration - INFO - Logged reply from fedamorton@gmail.com
+2026-02-09 21:53:31,969 - sheets_integration - INFO - Updated fedamorton@gmail.com status to replied (Batch)
+2026-02-09 21:53:33,202 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated postmaster@terrellisd.org with lead mbell@terrellisd.org via domain terrellisd.org
+2026-02-09 21:53:33,202 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for postmaster@terrellisd.org: Herman Furlough Jr Middle School / Administrator
+2026-02-09 21:53:33,741 - sheets_integration - INFO - Logged reply from postmaster@terrellisd.org
+2026-02-09 21:53:34,266 - sheets_integration - INFO - Updated mbell@terrellisd.org status to replied (Batch)
+2026-02-09 21:53:35,500 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated postmaster@terrellisd.org with lead mbell@terrellisd.org via domain terrellisd.org
+2026-02-09 21:53:35,500 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for postmaster@terrellisd.org: Herman Furlough Jr Middle School / Administrator
+2026-02-09 21:53:36,013 - sheets_integration - INFO - Logged reply from postmaster@terrellisd.org
+2026-02-09 21:53:36,568 - sheets_integration - INFO - Updated mbell@terrellisd.org status to replied (Batch)
+2026-02-09 21:53:37,842 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated postmaster@terrellisd.org with lead mbell@terrellisd.org via domain terrellisd.org
+2026-02-09 21:53:37,842 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for postmaster@terrellisd.org: Herman Furlough Jr Middle School / Administrator
+2026-02-09 21:53:38,351 - sheets_integration - INFO - Logged reply from postmaster@terrellisd.org
+2026-02-09 21:53:38,861 - sheets_integration - INFO - Updated mbell@terrellisd.org status to replied (Batch)
+2026-02-09 21:53:40,112 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for leonschram@johnpauliihs.org: John Paul II High School / Administrator
+2026-02-09 21:53:40,633 - sheets_integration - INFO - Logged reply from leonschram@johnpauliihs.org
+2026-02-09 21:53:41,163 - sheets_integration - INFO - Updated leonschram@johnpauliihs.org status to replied (Batch)
+2026-02-09 21:53:42,530 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for mmsbscarb@gmail.com: Winnsboro High School / Administrator
+2026-02-09 21:53:43,046 - sheets_integration - INFO - Logged reply from mmsbscarb@gmail.com
+2026-02-09 21:53:43,677 - sheets_integration - INFO - Updated mmsbscarb@gmail.com status to replied (Batch)
+2026-02-09 21:53:44,987 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for rhooker.broady@gmail.com: Emma Lee Broady Academy / Administrator
+2026-02-09 21:53:45,504 - sheets_integration - INFO - Logged reply from rhooker.broady@gmail.com
+2026-02-09 21:53:46,014 - sheets_integration - INFO - Updated rhooker.broady@gmail.com status to replied (Batch)
+2026-02-09 21:53:47,236 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for vrodriguez@rpsacademies.com: RPS Academies / Sports school
+2026-02-09 21:53:47,758 - sheets_integration - INFO - Logged reply from vrodriguez@rpsacademies.com
+2026-02-09 21:53:48,285 - sheets_integration - INFO - Updated vrodriguez@rpsacademies.com status to replied (Batch)
+2026-02-09 21:53:49,544 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for attendance@naplesclassical.org: Naples Classical Academy / High school
+2026-02-09 21:53:50,056 - sheets_integration - INFO - Logged reply from attendance@naplesclassical.org
+2026-02-09 21:53:50,669 - sheets_integration - INFO - Updated attendance@naplesclassical.org status to replied (Batch)
+2026-02-09 21:53:52,415 - sheets_integration - INFO - Logged reply from support@planningcenter.com
+2026-02-09 21:53:53,822 - sheets_integration - WARNING - Lead not found in sheet: support@planningcenter.com
+2026-02-09 21:53:55,056 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for mark@elizabethfarrellmusic.com: Elizabeth Farrell Music - South Sarasota / Music school
+2026-02-09 21:53:55,563 - sheets_integration - INFO - Logged reply from mark@elizabethfarrellmusic.com
+2026-02-09 21:53:56,068 - sheets_integration - INFO - Updated mark@elizabethfarrellmusic.com status to replied (Batch)
+2026-02-09 21:53:57,324 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for fly@patriotpilotacademy.com: Patriot Pilot Academy / Flight school
+2026-02-09 21:53:57,824 - sheets_integration - INFO - Logged reply from fly@patriotpilotacademy.com
+2026-02-09 21:53:58,341 - sheets_integration - INFO - Updated fly@patriotpilotacademy.com status to replied (Batch)
+2026-02-09 21:53:59,597 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for info@brightbridgepreparatory.com: Bright Bridge Preparatory / Special education school
+2026-02-09 21:54:00,102 - sheets_integration - INFO - Logged reply from info@brightbridgepreparatory.com
+2026-02-09 21:54:00,628 - sheets_integration - INFO - Updated info@brightbridgepreparatory.com status to replied (Batch)
+2026-02-09 21:54:02,396 - sheets_integration - INFO - Logged reply from jhiggs@thecovenantschool.org
+2026-02-09 21:54:04,048 - sheets_integration - WARNING - Lead not found in sheet: jhiggs@thecovenantschool.org
+2026-02-09 21:54:05,287 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for eumana@standrewsmiami.org: St. Andrew's Preschool / Preschool
+2026-02-09 21:54:05,802 - sheets_integration - INFO - Logged reply from eumana@standrewsmiami.org
+2026-02-09 21:54:06,322 - sheets_integration - INFO - Updated eumana@standrewsmiami.org status to replied (Batch)
+2026-02-09 21:54:07,565 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for mgines@rsavioracademy.com: Risen Savior Academy at Lakewood Ranch / Private educational institution
+2026-02-09 21:54:08,108 - sheets_integration - INFO - Logged reply from mgines@rsavioracademy.com
+2026-02-09 21:54:08,660 - sheets_integration - INFO - Updated mgines@rsavioracademy.com status to replied (Batch)
+2026-02-09 21:54:09,887 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated danielle@lifeprepchristianacademy.com with lead team@lifeprepchristianacademy.com via domain lifeprepchristianacademy.com
+2026-02-09 21:54:09,888 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for danielle@lifeprepchristianacademy.com: Life Prep Christian Academy / K-12 school
+2026-02-09 21:54:10,414 - sheets_integration - INFO - Logged reply from danielle@lifeprepchristianacademy.com
+2026-02-09 21:54:10,942 - sheets_integration - INFO - Updated team@lifeprepchristianacademy.com status to replied (Batch)
+2026-02-09 21:54:12,180 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated jovanna@alphaperformance.net with lead support@alphaperformance.net via domain alphaperformance.net
+2026-02-09 21:54:12,180 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for jovanna@alphaperformance.net: Alpha Performance Group / Volleyball instructor
+2026-02-09 21:54:12,696 - sheets_integration - INFO - Logged reply from jovanna@alphaperformance.net
+2026-02-09 21:54:13,214 - sheets_integration - INFO - Updated support@alphaperformance.net status to replied (Batch)
+2026-02-09 21:54:14,424 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for support@alphaperformance.net: Alpha Performance Group / Volleyball instructor
+2026-02-09 21:54:14,919 - sheets_integration - INFO - Logged reply from support@alphaperformance.net
+2026-02-09 21:54:15,431 - sheets_integration - INFO - Updated support@alphaperformance.net status to replied (Batch)
+2026-02-09 21:54:17,179 - sheets_integration - INFO - Logged reply from rollingwavesfl@gmail.com
+2026-02-09 21:54:18,601 - sheets_integration - WARNING - Lead not found in sheet: rollingwavesfl@gmail.com
+2026-02-09 21:54:19,853 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for eglinaeroclub@gmail.com: Eglin Aero Club / Club
+2026-02-09 21:54:20,363 - sheets_integration - INFO - Logged reply from eglinaeroclub@gmail.com
+2026-02-09 21:54:20,889 - sheets_integration - INFO - Updated eglinaeroclub@gmail.com status to replied (Batch)
+2026-02-09 21:54:22,080 - sheets_integration - WARNING - ⚠️ Google Sheets Quota hit. Waiting 30s before retry 1/3...
+2026-02-09 21:54:52,370 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated gambrioso@capechristian.com with lead preschool@capechristian.com via domain capechristian.com
+2026-02-09 21:54:52,370 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for gambrioso@capechristian.com: Cape Christian Preschool / Preschool
+2026-02-09 21:54:52,873 - sheets_integration - INFO - Logged reply from gambrioso@capechristian.com
+2026-02-09 21:54:53,432 - sheets_integration - INFO - Updated preschool@capechristian.com status to replied (Batch)
+2026-02-09 21:54:54,663 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for tina@mysproutacademy.com: Sprout Academy Deep Creek / Preschool
+2026-02-09 21:54:55,232 - sheets_integration - INFO - Logged reply from tina@mysproutacademy.com
+2026-02-09 21:54:55,752 - sheets_integration - INFO - Updated tina@mysproutacademy.com status to replied (Batch)
+2026-02-09 21:54:56,990 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for angieh@pccumc.org: Pasadena Community Church School / Preschool
+2026-02-09 21:54:57,551 - sheets_integration - INFO - Logged reply from angieh@pccumc.org
+2026-02-09 21:54:58,119 - sheets_integration - INFO - Updated angieh@pccumc.org status to replied (Batch)
+2026-02-09 21:54:59,433 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for aingerpto@gmail.com: L.A. Ainger Middle School / Middle school
+2026-02-09 21:54:59,956 - sheets_integration - INFO - Logged reply from aingerpto@gmail.com
+2026-02-09 21:55:00,524 - sheets_integration - INFO - Updated aingerpto@gmail.com status to replied (Batch)
+2026-02-09 21:55:01,892 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for eglinaeroclub@gmail.com: Eglin Aero Club / Club
+2026-02-09 21:55:02,414 - sheets_integration - INFO - Logged reply from eglinaeroclub@gmail.com
+2026-02-09 21:55:03,019 - sheets_integration - INFO - Updated eglinaeroclub@gmail.com status to replied (Batch)
+2026-02-09 21:55:04,246 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for info@15thstfarm.com: 15th St Farm / Event venue
+2026-02-09 21:55:04,776 - sheets_integration - INFO - Logged reply from info@15thstfarm.com
+2026-02-09 21:55:05,300 - sheets_integration - INFO - Updated info@15thstfarm.com status to replied (Batch)
+2026-02-09 21:55:06,602 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for capt.bill@sarabaysailing.com: Sara Bay Sailing School and Charter / Sailing school
+2026-02-09 21:55:07,096 - sheets_integration - INFO - Logged reply from capt.bill@sarabaysailing.com
+2026-02-09 21:55:07,651 - sheets_integration - INFO - Updated capt.bill@sarabaysailing.com status to replied (Batch)
+2026-02-09 21:55:08,872 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for capt.bill@sarabaysailing.com: Sara Bay Sailing School and Charter / Sailing school
+2026-02-09 21:55:09,395 - sheets_integration - INFO - Logged reply from capt.bill@sarabaysailing.com
+2026-02-09 21:55:09,919 - sheets_integration - INFO - Updated capt.bill@sarabaysailing.com status to replied (Batch)
+2026-02-09 21:55:11,173 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for godizfaithful@gmail.com: Ignite Academy / Middle school
+2026-02-09 21:55:11,821 - sheets_integration - INFO - Logged reply from godizfaithful@gmail.com
+2026-02-09 21:55:12,399 - sheets_integration - INFO - Updated godizfaithful@gmail.com status to replied (Batch)
+2026-02-09 21:55:13,593 - sheets_integration - WARNING - ⚠️ Google Sheets Quota hit. Waiting 30s before retry 1/3...
+2026-02-09 21:55:44,137 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for orlando@antares.edu: Antares English School Fort Myers / English language school
+2026-02-09 21:55:44,678 - sheets_integration - INFO - Logged reply from orlando@antares.edu
+2026-02-09 21:55:45,371 - sheets_integration - INFO - Updated orlando@antares.edu status to replied (Batch)
+2026-02-09 21:55:46,605 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for learn@apogeestpete.com: Apogee St Pete / Education center
+2026-02-09 21:55:47,163 - sheets_integration - INFO - Logged reply from learn@apogeestpete.com
+2026-02-09 21:55:47,724 - sheets_integration - INFO - Updated learn@apogeestpete.com status to replied (Batch)
+2026-02-09 21:55:48,997 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for dominiuminstitutellc@gmail.com: Dominium Institute / Nursing school
+2026-02-09 21:55:49,611 - sheets_integration - INFO - Logged reply from dominiuminstitutellc@gmail.com
+2026-02-09 21:55:50,153 - sheets_integration - INFO - Updated dominiuminstitutellc@gmail.com status to replied (Batch)
+2026-02-09 21:55:51,400 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated sposh@els.edu with lead grr@els.edu via domain els.edu
+2026-02-09 21:55:51,401 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for sposh@els.edu: ELS Language Center - St. Petersburg / English language school
+2026-02-09 21:55:51,965 - sheets_integration - INFO - Logged reply from sposh@els.edu
+2026-02-09 21:55:52,576 - sheets_integration - INFO - Updated grr@els.edu status to replied (Batch)
+2026-02-09 21:55:53,862 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for ibck.visitor@gmail.com: IBCK Educational Center / Religious school
+2026-02-09 21:55:54,525 - sheets_integration - INFO - Logged reply from ibck.visitor@gmail.com
+2026-02-09 21:55:55,137 - sheets_integration - INFO - Updated ibck.visitor@gmail.com status to replied (Batch)
+2026-02-09 21:55:56,935 - sheets_integration - INFO - Logged reply from tracy.worden@fdlrsheartland.org
+2026-02-09 21:55:59,193 - sheets_integration - WARNING - Lead not found in sheet: tracy.worden@fdlrsheartland.org
+2026-02-09 21:56:00,565 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for info@integrityfinearts.com: Integrity School of the Arts / Association / Organization
+2026-02-09 21:56:01,181 - sheets_integration - INFO - Logged reply from info@integrityfinearts.com
+2026-02-09 21:56:01,753 - sheets_integration - INFO - Updated info@integrityfinearts.com status to replied (Batch)
+2026-02-09 21:56:03,027 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated joann.dorries@ocps.net with lead alvarezo@ocps.net via domain ocps.net
+2026-02-09 21:56:03,028 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for joann.dorries@ocps.net: Doral Academy Preparatory School / High school
+2026-02-09 21:56:03,565 - sheets_integration - INFO - Logged reply from joann.dorries@ocps.net
+2026-02-09 21:56:04,109 - sheets_integration - INFO - Updated alvarezo@ocps.net status to replied (Batch)
+2026-02-09 21:56:05,337 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for ecarte@facs.ocalafirst.org: First Assembly Christian School / Private educational institution
+2026-02-09 21:56:05,996 - sheets_integration - INFO - Logged reply from ecarte@facs.ocalafirst.org
+2026-02-09 21:56:06,912 - sheets_integration - INFO - Updated ecarte@facs.ocalafirst.org status to replied (Batch)
+2026-02-09 21:56:08,140 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for katie@corianderfarm.com: Coriander Farm / Horse riding school
+2026-02-09 21:56:08,683 - sheets_integration - INFO - Logged reply from katie@corianderfarm.com
+2026-02-09 21:56:09,233 - sheets_integration - INFO - Updated katie@corianderfarm.com status to replied (Batch)
+2026-02-09 21:56:11,320 - sheets_integration - INFO - Logged reply from heliperformance@yahoo.com
+2026-02-09 21:56:13,116 - sheets_integration - WARNING - Lead not found in sheet: heliperformance@yahoo.com
+2026-02-09 21:56:14,360 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for jf3761@comcast.net: J-Tech Institute / Technical school
+2026-02-09 21:56:15,008 - sheets_integration - INFO - Logged reply from jf3761@comcast.net
+2026-02-09 21:56:15,557 - sheets_integration - INFO - Updated jf3761@comcast.net status to replied (Batch)
+2026-02-09 21:56:17,463 - sheets_integration - INFO - Logged reply from tads-support@venturedsolutions.com
+2026-02-09 21:56:19,661 - sheets_integration - WARNING - Lead not found in sheet: tads-support@venturedsolutions.com
+2026-02-09 21:56:20,947 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for info@montessoriclub.org: Montessori Club Farm- Daycare - Private school Kissimmee / Montessori preschool
+2026-02-09 21:56:21,486 - sheets_integration - INFO - Logged reply from info@montessoriclub.org
+2026-02-09 21:56:22,070 - sheets_integration - INFO - Updated info@montessoriclub.org status to replied (Batch)
+2026-02-09 21:56:23,321 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for ccsc@clearwatercommunitysailing.org: Clearwater Community Sailing Center / Sailing school
+2026-02-09 21:56:23,912 - sheets_integration - INFO - Logged reply from ccsc@clearwatercommunitysailing.org
+2026-02-09 21:56:24,426 - sheets_integration - INFO - Updated ccsc@clearwatercommunitysailing.org status to replied (Batch)
+2026-02-09 21:56:25,667 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for info@covenantacademyfl.org: Covenant Academy / General education school
+2026-02-09 21:56:26,204 - sheets_integration - INFO - Logged reply from info@covenantacademyfl.org
+2026-02-09 21:56:26,741 - sheets_integration - INFO - Updated info@covenantacademyfl.org status to replied (Batch)
+2026-02-09 21:56:27,989 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for ccsc@clearwatercommunitysailing.org: Clearwater Community Sailing Center / Sailing school
+2026-02-09 21:56:28,610 - sheets_integration - INFO - Logged reply from ccsc@clearwatercommunitysailing.org
+2026-02-09 21:56:29,211 - sheets_integration - INFO - Updated ccsc@clearwatercommunitysailing.org status to replied (Batch)
+2026-02-09 21:56:30,447 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for info@lhap.org: Little Hands Academy and Preschool / Preschool
+2026-02-09 21:56:30,987 - sheets_integration - INFO - Logged reply from info@lhap.org
+2026-02-09 21:56:31,694 - sheets_integration - INFO - Updated info@lhap.org status to replied (Batch)
+2026-02-09 21:56:32,948 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for claire@emeraldcoastacademics.com: The Balanced Scholar / Educational institution
+2026-02-09 21:56:33,459 - sheets_integration - INFO - Logged reply from claire@emeraldcoastacademics.com
+2026-02-09 21:56:34,153 - sheets_integration - INFO - Updated claire@emeraldcoastacademics.com status to replied (Batch)
+2026-02-09 21:56:35,380 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for avalon.staff@orlandometrogyms.com: Orlando Metro Gymnastics Baldwin Park / Gymnastics center
+2026-02-09 21:56:36,002 - sheets_integration - INFO - Logged reply from avalon.staff@orlandometrogyms.com
+2026-02-09 21:56:36,710 - sheets_integration - INFO - Updated avalon.staff@orlandometrogyms.com status to replied (Batch)
+2026-02-09 21:56:38,636 - sheets_integration - INFO - Logged reply from ryan@withprimer.com
+2026-02-09 21:56:40,437 - sheets_integration - WARNING - Lead not found in sheet: ryan@withprimer.com
+2026-02-09 21:56:42,360 - sheets_integration - INFO - Logged reply from ryan@withprimer.com
+2026-02-09 21:56:44,047 - sheets_integration - WARNING - Lead not found in sheet: ryan@withprimer.com
+2026-02-09 21:56:45,320 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for sarah@floridafarmschool.org: Farm school / Elementary school
+2026-02-09 21:56:45,886 - sheets_integration - INFO - Logged reply from sarah@floridafarmschool.org
+2026-02-09 21:56:46,616 - sheets_integration - INFO - Updated sarah@floridafarmschool.org status to replied (Batch)
+2026-02-09 21:56:47,851 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for admissions@latamglobalschool.com: Latam Global School / Study at home school
+2026-02-09 21:56:48,466 - sheets_integration - INFO - Logged reply from admissions@latamglobalschool.com
+2026-02-09 21:56:48,993 - sheets_integration - INFO - Updated admissions@latamglobalschool.com status to replied (Batch)
+2026-02-09 21:56:50,252 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for andrewarena@gmail.com: Cooley Law School / Law school
+2026-02-09 21:56:50,842 - sheets_integration - INFO - Logged reply from andrewarena@gmail.com
+2026-02-09 21:56:51,764 - sheets_integration - INFO - Updated andrewarena@gmail.com status to replied (Batch)
+2026-02-09 21:56:53,200 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for sales@mkuschools.com: Montessori Kids Universe Baldwin Park / Montessori preschool
+2026-02-09 21:56:53,791 - sheets_integration - INFO - Logged reply from sales@mkuschools.com
+2026-02-09 21:56:54,435 - sheets_integration - INFO - Updated sales@mkuschools.com status to replied (Batch)
+2026-02-09 21:56:55,774 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated senior1@gtcom.net with lead deanhollis@gtcom.net via domain gtcom.net
+2026-02-09 21:56:55,775 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for senior1@gtcom.net: Apalachicola Bay Charter School / Administrator
+2026-02-09 21:56:56,380 - sheets_integration - INFO - Logged reply from senior1@gtcom.net
+2026-02-09 21:56:56,912 - sheets_integration - INFO - Updated deanhollis@gtcom.net status to replied (Batch)
+2026-02-09 21:56:58,323 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for support@clarityapp.com: Westbridge Academy / Education center
+2026-02-09 21:56:58,886 - sheets_integration - INFO - Logged reply from support@clarityapp.com
+2026-02-09 21:56:59,445 - sheets_integration - INFO - Updated support@clarityapp.com status to replied (Batch)
+2026-02-09 21:57:00,808 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for support@clarityapp.com: Westbridge Academy / Education center
+2026-02-09 21:57:01,458 - sheets_integration - INFO - Logged reply from support@clarityapp.com
+2026-02-09 21:57:02,093 - sheets_integration - INFO - Updated support@clarityapp.com status to replied (Batch)
+2026-02-09 21:57:03,349 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for empowerobc@gmail.com: Empower School of Discipleship / Religious school
+2026-02-09 21:57:03,903 - sheets_integration - INFO - Logged reply from empowerobc@gmail.com
+2026-02-09 21:57:04,428 - sheets_integration - INFO - Updated empowerobc@gmail.com status to replied (Batch)
+2026-02-09 21:57:05,657 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for dchase@nwbchurch.org: NCA / Middle school
+2026-02-09 21:57:06,207 - sheets_integration - INFO - Logged reply from dchase@nwbchurch.org
+2026-02-09 21:57:06,792 - sheets_integration - INFO - Updated dchase@nwbchurch.org status to replied (Batch)
+2026-02-09 21:57:08,019 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for jobs@ois.dance: Orlando International School of Dance / Dance school
+2026-02-09 21:57:08,540 - sheets_integration - INFO - Logged reply from jobs@ois.dance
+2026-02-09 21:57:09,303 - sheets_integration - INFO - Updated jobs@ois.dance status to replied (Batch)
+2026-02-09 21:57:10,547 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated jaimenichols@thefirstacademy.org with lead admissions@thefirstacademy.org via domain thefirstacademy.org
+2026-02-09 21:57:10,547 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for jaimenichols@thefirstacademy.org: The First Hope / Private educational institution
+2026-02-09 21:57:11,111 - sheets_integration - INFO - Logged reply from jaimenichols@thefirstacademy.org
+2026-02-09 21:57:11,737 - sheets_integration - INFO - Updated admissions@thefirstacademy.org status to replied (Batch)
+2026-02-09 21:57:12,997 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated postmaster@cfl.rr.com with lead perrinec@cfl.rr.com via domain cfl.rr.com
+2026-02-09 21:57:12,997 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for postmaster@cfl.rr.com: Einstein Academy / Private educational institution
+2026-02-09 21:57:13,557 - sheets_integration - INFO - Logged reply from postmaster@cfl.rr.com
+2026-02-09 21:57:14,072 - sheets_integration - INFO - Updated perrinec@cfl.rr.com status to replied (Batch)
+2026-02-09 21:57:15,526 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated ryan.wantuch@tampalanguagecenter.com with lead eva.velec@tampalanguagecenter.com via domain tampalanguagecenter.com
+2026-02-09 21:57:15,526 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for ryan.wantuch@tampalanguagecenter.com: Tampa Language Center / Language school
+2026-02-09 21:57:16,139 - sheets_integration - INFO - Logged reply from ryan.wantuch@tampalanguagecenter.com
+2026-02-09 21:57:16,642 - sheets_integration - INFO - Updated eva.velec@tampalanguagecenter.com status to replied (Batch)
+2026-02-09 21:57:17,912 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for ssha@mail.com: Sunshine State Homeschool Academy / Study at home school
+2026-02-09 21:57:18,458 - sheets_integration - INFO - Logged reply from ssha@mail.com
+2026-02-09 21:57:19,109 - sheets_integration - INFO - Updated ssha@mail.com status to replied (Batch)
+2026-02-09 21:57:20,445 - sheets_integration - WARNING - ⚠️ Google Sheets Quota hit. Waiting 30s before retry 1/3...
+2026-02-09 21:57:51,470 - sheets_integration - INFO - Logged reply from tads-support@venturedsolutions.com
+2026-02-09 21:57:53,389 - sheets_integration - WARNING - Lead not found in sheet: tads-support@venturedsolutions.com
+2026-02-09 21:57:54,746 - sheets_integration - INFO - 📡 Fetching fresh records from Google Sheets...
+2026-02-09 21:57:58,089 - sheets_integration - INFO - Logged reply from khintonscott@cdspatriots.org
+2026-02-09 21:57:59,798 - sheets_integration - WARNING - Lead not found in sheet: khintonscott@cdspatriots.org
+2026-02-09 21:58:01,063 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated infoabhes@abhes.org with lead info@abhes.org via domain abhes.org
+2026-02-09 21:58:01,063 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for infoabhes@abhes.org: Taylor College / College
+2026-02-09 21:58:01,604 - sheets_integration - INFO - Logged reply from infoabhes@abhes.org
+2026-02-09 21:58:02,178 - sheets_integration - INFO - Updated info@abhes.org status to replied (Batch)
+2026-02-09 21:58:03,418 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated infoabhes@abhes.org with lead info@abhes.org via domain abhes.org
+2026-02-09 21:58:03,419 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for infoabhes@abhes.org: Taylor College / College
+2026-02-09 21:58:03,959 - sheets_integration - INFO - Logged reply from infoabhes@abhes.org
+2026-02-09 21:58:04,576 - sheets_integration - INFO - Updated info@abhes.org status to replied (Batch)
+2026-02-09 21:58:05,800 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for thecbcclub@gmail.com: Cristy B Comedy / Comedy club
+2026-02-09 21:58:06,341 - sheets_integration - INFO - Logged reply from thecbcclub@gmail.com
+2026-02-09 21:58:06,838 - sheets_integration - INFO - Updated thecbcclub@gmail.com status to replied (Batch)
+2026-02-09 21:58:08,072 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for jessiejohns8@gmail.com: Generations Christian Homeschool / Educational institution
+2026-02-09 21:58:08,628 - sheets_integration - INFO - Logged reply from jessiejohns8@gmail.com
+2026-02-09 21:58:09,183 - sheets_integration - INFO - Updated jessiejohns8@gmail.com status to replied (Batch)
+2026-02-09 21:58:10,520 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for kidsmin.cumc@gmail.com: Community Christian School / Preschool
+2026-02-09 21:58:11,109 - sheets_integration - INFO - Logged reply from kidsmin.cumc@gmail.com
+2026-02-09 21:58:11,743 - sheets_integration - INFO - Updated kidsmin.cumc@gmail.com status to replied (Batch)
+2026-02-09 21:58:12,983 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated kcao@cagables.com with lead info@cagables.com via domain cagables.com
+2026-02-09 21:58:12,983 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for kcao@cagables.com: Crystal Academy / Special education school
+2026-02-09 21:58:13,556 - sheets_integration - INFO - Logged reply from kcao@cagables.com
+2026-02-09 21:58:14,076 - sheets_integration - INFO - Updated info@cagables.com status to replied (Batch)
+2026-02-09 21:58:15,335 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated auto-reply from ric1@brighthouse.com with lead ric1@brighthouse.com via domain brighthouse.com
+2026-02-09 21:58:15,335 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for auto-reply from ric1@brighthouse.com: Teens in Flight / Flight school
+2026-02-09 21:58:15,939 - sheets_integration - INFO - Logged reply from auto-reply from ric1@brighthouse.com
+2026-02-09 21:58:16,515 - sheets_integration - INFO - Updated ric1@brighthouse.com status to replied (Batch)
+2026-02-09 21:58:17,743 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for olieaviation@gmail.com: Olie Aviation / Flight school
+2026-02-09 21:58:18,311 - sheets_integration - INFO - Logged reply from olieaviation@gmail.com
+2026-02-09 21:58:18,912 - sheets_integration - INFO - Updated olieaviation@gmail.com status to replied (Batch)
+2026-02-09 21:58:20,171 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated janice.pulcini@behaviorlearn.com with lead blsoffice@behaviorlearn.com via domain behaviorlearn.com
+2026-02-09 21:58:20,171 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for janice.pulcini@behaviorlearn.com: Behavior Learning Systems / Education center
+2026-02-09 21:58:20,727 - sheets_integration - INFO - Logged reply from janice.pulcini@behaviorlearn.com
+2026-02-09 21:58:21,269 - sheets_integration - INFO - Updated blsoffice@behaviorlearn.com status to replied (Batch)
+2026-02-09 21:58:22,599 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated jpickton@flprep.com with lead admissions@flprep.com via domain flprep.com
+2026-02-09 21:58:22,599 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for jpickton@flprep.com: Florida Preparatory Academy (Florida Prep) / High school
+2026-02-09 21:58:23,165 - sheets_integration - INFO - Logged reply from jpickton@flprep.com
+2026-02-09 21:58:23,694 - sheets_integration - INFO - Updated admissions@flprep.com status to replied (Batch)
+2026-02-09 21:58:24,932 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for apcecheryl@gmail.com: Rockledge Presbyterian School / Preschool
+2026-02-09 21:58:25,568 - sheets_integration - INFO - Logged reply from apcecheryl@gmail.com
+2026-02-09 21:58:26,282 - sheets_integration - INFO - Updated apcecheryl@gmail.com status to replied (Batch)
+2026-02-09 21:58:27,516 - sheets_integration - INFO - 🔍 [DOMAIN MATCH] Associated cindy@surfsideacademy.net with lead info@surfsideacademy.net via domain surfsideacademy.net
+2026-02-09 21:58:27,516 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for cindy@surfsideacademy.net: Surfside Academy of West Palm Beach / Preschool
+2026-02-09 21:58:28,110 - sheets_integration - INFO - Logged reply from cindy@surfsideacademy.net
+2026-02-09 21:58:28,623 - sheets_integration - INFO - Updated info@surfsideacademy.net status to replied (Batch)
+2026-02-09 21:58:29,972 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for matt@pixelspread.com: The Oaks Classical Christian Academy / School house
+2026-02-09 21:58:30,512 - sheets_integration - INFO - Logged reply from matt@pixelspread.com
+2026-02-09 21:58:31,095 - sheets_integration - INFO - Updated matt@pixelspread.com status to replied (Batch)
+2026-02-09 21:58:32,333 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for matt@pixelspread.com: The Oaks Classical Christian Academy / School house
+2026-02-09 21:58:32,878 - sheets_integration - INFO - Logged reply from matt@pixelspread.com
+2026-02-09 21:58:33,506 - sheets_integration - INFO - Updated matt@pixelspread.com status to replied (Batch)
+2026-02-09 21:58:34,748 - sheets_integration - INFO - ✨ [ENRICH] Found lead info for principal.stambrose@gmail.com: St Ambrose Catholic School / Catholic school
+2026-02-09 21:58:35,498 - sheets_integration - INFO - Logged reply from principal.stambrose@gmail.com
+2026-02-09 21:58:36,180 - sheets_integration - INFO - Updated principal.stambrose@gmail.com status to replied (Batch)
+🚀 Starting Recovery of Missing Replies...
+📡 Fetching lead records and existing replies...
+📡 Fetching ALL inbound messages from Mailreef...
+✅ Found 1128 total inbound messages.
+🔍 Identified 91 missing replies to log.
+✍️ Logging missing reply from: sdhager@forneyisd.net...
+✍️ Logging missing reply from: advclublearning@gmail.com...
+✍️ Logging missing reply from: postmaster@cfl.rr.com...
+✍️ Logging missing reply from: kelly.lawrence@palmbeachschools.org...
+✍️ Logging missing reply from: hatth82@gmail.com...
+✍️ Logging missing reply from: admissions@mydreamsacademy.org...
+✍️ Logging missing reply from: jonathanrobertson@sudanisd.net...
+✍️ Logging missing reply from: mary@woodlandministries.com...
+✍️ Logging missing reply from: fedamorton@gmail.com...
+✍️ Logging missing reply from: postmaster@terrellisd.org...
+✍️ Logging missing reply from: postmaster@terrellisd.org...
+✍️ Logging missing reply from: postmaster@terrellisd.org...
+✍️ Logging missing reply from: leonschram@johnpauliihs.org...
+✍️ Logging missing reply from: mmsbscarb@gmail.com...
+✍️ Logging missing reply from: rhooker.broady@gmail.com...
+✍️ Logging missing reply from: vrodriguez@rpsacademies.com...
+✍️ Logging missing reply from: attendance@naplesclassical.org...
+✍️ Logging missing reply from: support@planningcenter.com...
+✍️ Logging missing reply from: mark@elizabethfarrellmusic.com...
+✍️ Logging missing reply from: fly@patriotpilotacademy.com...
+✍️ Logging missing reply from: info@brightbridgepreparatory.com...
+✍️ Logging missing reply from: jhiggs@thecovenantschool.org...
+✍️ Logging missing reply from: eumana@standrewsmiami.org...
+✍️ Logging missing reply from: mgines@rsavioracademy.com...
+✍️ Logging missing reply from: danielle@lifeprepchristianacademy.com...
+✍️ Logging missing reply from: jovanna@alphaperformance.net...
+✍️ Logging missing reply from: support@alphaperformance.net...
+✍️ Logging missing reply from: rollingwavesfl@gmail.com...
+✍️ Logging missing reply from: eglinaeroclub@gmail.com...
+✍️ Logging missing reply from: gambrioso@capechristian.com...
+✍️ Logging missing reply from: tina@mysproutacademy.com...
+✍️ Logging missing reply from: angieh@pccumc.org...
+✍️ Logging missing reply from: aingerpto@gmail.com...
+✍️ Logging missing reply from: eglinaeroclub@gmail.com...
+✍️ Logging missing reply from: info@15thstfarm.com...
+✍️ Logging missing reply from: capt.bill@sarabaysailing.com...
+✍️ Logging missing reply from: capt.bill@sarabaysailing.com...
+✍️ Logging missing reply from: godizfaithful@gmail.com...
+✍️ Logging missing reply from: orlando@antares.edu...
+✍️ Logging missing reply from: learn@apogeestpete.com...
+✍️ Logging missing reply from: dominiuminstitutellc@gmail.com...
+✍️ Logging missing reply from: sposh@els.edu...
+✍️ Logging missing reply from: ibck.visitor@gmail.com...
+✍️ Logging missing reply from: tracy.worden@fdlrsheartland.org...
+✍️ Logging missing reply from: info@integrityfinearts.com...
+✍️ Logging missing reply from: joann.dorries@ocps.net...
+✍️ Logging missing reply from: ecarte@facs.ocalafirst.org...
+✍️ Logging missing reply from: katie@corianderfarm.com...
+✍️ Logging missing reply from: heliperformance@yahoo.com...
+✍️ Logging missing reply from: jf3761@comcast.net...
+✍️ Logging missing reply from: tads-support@venturedsolutions.com...
+✍️ Logging missing reply from: info@montessoriclub.org...
+✍️ Logging missing reply from: ccsc@clearwatercommunitysailing.org...
+✍️ Logging missing reply from: info@covenantacademyfl.org...
+✍️ Logging missing reply from: ccsc@clearwatercommunitysailing.org...
+✍️ Logging missing reply from: info@lhap.org...
+✍️ Logging missing reply from: claire@emeraldcoastacademics.com...
+✍️ Logging missing reply from: avalon.staff@orlandometrogyms.com...
+✍️ Logging missing reply from: ryan@withprimer.com...
+✍️ Logging missing reply from: ryan@withprimer.com...
+✍️ Logging missing reply from: sarah@floridafarmschool.org...
+✍️ Logging missing reply from: admissions@latamglobalschool.com...
+✍️ Logging missing reply from: andrewarena@gmail.com...
+✍️ Logging missing reply from: sales@mkuschools.com...
+✍️ Logging missing reply from: senior1@gtcom.net...
+✍️ Logging missing reply from: support@clarityapp.com...
+✍️ Logging missing reply from: support@clarityapp.com...
+✍️ Logging missing reply from: empowerobc@gmail.com...
+✍️ Logging missing reply from: dchase@nwbchurch.org...
+✍️ Logging missing reply from: jobs@ois.dance...
+✍️ Logging missing reply from: jaimenichols@thefirstacademy.org...
+✍️ Logging missing reply from: postmaster@cfl.rr.com...
+✍️ Logging missing reply from: ryan.wantuch@tampalanguagecenter.com...
+✍️ Logging missing reply from: ssha@mail.com...
+✍️ Logging missing reply from: tads-support@venturedsolutions.com...
+✍️ Logging missing reply from: khintonscott@cdspatriots.org...
+✍️ Logging missing reply from: infoabhes@abhes.org...
+✍️ Logging missing reply from: infoabhes@abhes.org...
+✍️ Logging missing reply from: thecbcclub@gmail.com...
+✍️ Logging missing reply from: jessiejohns8@gmail.com...
+✍️ Logging missing reply from: kidsmin.cumc@gmail.com...
+✍️ Logging missing reply from: kcao@cagables.com...
+✍️ Logging missing reply from: auto-reply from ric1@brighthouse.com...
+✍️ Logging missing reply from: olieaviation@gmail.com...
+✍️ Logging missing reply from: janice.pulcini@behaviorlearn.com...
+✍️ Logging missing reply from: jpickton@flprep.com...
+✍️ Logging missing reply from: apcecheryl@gmail.com...
+✍️ Logging missing reply from: cindy@surfsideacademy.net...
+✍️ Logging missing reply from: matt@pixelspread.com...
+✍️ Logging missing reply from: matt@pixelspread.com...
+✍️ Logging missing reply from: principal.stambrose@gmail.com...
+✅ Successfully recovered and logged 91 replies.

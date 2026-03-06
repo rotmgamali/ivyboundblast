@@ -130,5 +130,19 @@ def test_prompt_construction():
     if "Best,\nMark Greenstein" in envelope_4['sign_off']:
         print("✅ SUCCESS: Envelope correct sign-off.")
 
+    # Test Case 5: Public vs Private Context
+    sys_prompt_5, user_prompt_5, _ = generator._prepare_school_prompts(
+        template_content="Hi {{first_name}}, public test.",
+        lead_data={"school_type": "Public", "role": "Principal", "school_name": "Public High"},
+        website_content="...",
+        sequence_number=1,
+        sender_email="mark@test.com"
+    )
+    print("\n--- TEST 5: Public School Context ---")
+    if "IF PUBLIC:" in sys_prompt_5:
+        print("✅ SUCCESS: System Prompt includes PUBLIC context.")
+    else:
+        print(f"❌ FAIL: Context missing in System Prompt: {sys_prompt_5}")
+
 if __name__ == "__main__":
     test_prompt_construction()

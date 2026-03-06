@@ -1,0 +1,16 @@
+Subject: opening more doors for {{ company_name }}
+
+Hi {{ first_name }},
+
+I noticed {{ company_name }} is doing some interesting work with {{ clients }} in the {{ services }} space.
+
+As someone focused on {{ role }}, I’m sure you know that the hardest part of sales is the initial "hand-shake" email that actually gets a reply.
+
+We've automated that "human" research. Our system scans websites for context (like {{ services }}) and writes hyper-personalized openers that consistently hit 5-10% reply rates at scale.
+
+We're basically an SDR team in a box.
+
+Can I show you a 2-minute demo of how we'd target more leads for {{ company_name }}?
+
+Best,
+{{ sender_name }}

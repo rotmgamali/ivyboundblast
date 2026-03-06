@@ -10,3 +10,6 @@ google-auth
 google-auth-oauthlib
 python-dotenv
 httpx
+playwright
+nest-asyncio
+dnspython

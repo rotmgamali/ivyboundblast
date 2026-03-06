@@ -11,7 +11,10 @@ import os
 
 # Add project root to path BEFORE any other imports
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Add project root to path BEFORE any other imports
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
+sys.path.insert(0, os.path.join(ROOT_DIR, "mailreef_automation"))
 
 # Debug: List root dir to see if automation_scrapers is there
 print(f"DEBUG: ROOT_DIR is {ROOT_DIR}")
@@ -37,12 +40,26 @@ import lock_util
 logger = get_logger("SYSTEM_MAIN")
 
 def main():
-    """Initialize and start the email automation"""
-    # Safety first: Ensure only one instance runs
-    lock_util.ensure_singleton('sender')
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--profile", type=str, default="IVYBOUND", help="Campaign profile (IVYBOUND or STRATEGY_B)")
+    args = parser.parse_args()
+    
+    profile_name = args.profile.upper()
+    
+    # --- HARDENING: Configure Profile-Specific Logging ---
+    # We must access config here to get the log file name
+    log_file = automation_config.CAMPAIGN_PROFILES[profile_name].get("log_file", "automation.log")
+    logger = get_logger("SYSTEM_MAIN", log_filename=log_file)
+    
+    lock_name = f'sender_{profile_name.lower()}'
+
+    # Safety first: Ensure only one instance runs per profile
+    lock_util.ensure_singleton(lock_name)
     
     try:
-        logger.info("Initializing Mailreef Email Automation System")
+        logger.info(f"Initializing Mailreef Email Automation System (Profile: {profile_name})")
+        logger.info(f"🔒 [HARDENING] Logging to isolated file: logs/{log_file}")
         
         class ConfigWrapper:
             pass
@@ -72,21 +89,25 @@ def main():
             base_url=cfg.MAILREEF_API_BASE
         )
         
-        # Cloud-First: We don't use SQLite anymore.
-        # db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "campaign.db")
-        # contacts = ContactManager(database_path=db_path)
-        
-        # Check for stale locks from previous crashes (Leaving this as it might be used by lock_util for process locks, but not db locks)
-        # logger.info("Audit: Checking for stale lead locks...")
-        # contacts.scan_stale_locks()
-        
         # Init Scheduler with Sheets
         try:
             scheduler = EmailScheduler(
                 mailreef_client=mailreef,
-                # contact_manager=contacts, # Removed
-                config=cfg
+                config=cfg,
+                campaign_profile=profile_name
             )
+            
+            # --- ZERO-DUPLICATE HYDRATION ---
+            try:
+                from suppression_manager import SuppressionManager
+                sm = SuppressionManager()
+                logger.info("📡 [NUCLEAR OPTION] Syncing suppression list from Google Sheets...")
+                # Note: This will pull from the Master Suppression List
+                # If the quota is still hit, it will log a warning but continue with local DB.
+                sm.sync_from_sheets()
+            except Exception as e:
+                logger.error(f"⚠️ Failed to hydrate suppression list: {e}")
+                
         except Exception as e:
             logger.critical(f"Failed to initialize scheduler (likely Sheets Auth error): {e}")
             return
@@ -126,14 +147,18 @@ def main():
         monitor.start()
         
         # Start Reply Watcher (Background Thread)
-        logger.info("Starting reply watcher...")
+        logger.info(f"Starting reply watcher for {profile_name}...")
         from reply_watcher import ReplyWatcher
-        watcher = ReplyWatcher()
+        watcher = ReplyWatcher(
+            mailreef_client=mailreef,
+            config=cfg,
+            profile_name=profile_name
+        )
         import threading
         watcher_thread = threading.Thread(target=watcher.run_daemon, daemon=True)
         watcher_thread.start()
         
-        logger.info("Email automation system is now running (Sheets-First Mode)")
+        logger.info(f"Email automation system is now running (Sheets-First Mode: {profile_name})")
         
         # Keep the main thread alive
         while True:
@@ -148,8 +173,15 @@ def main():
     finally:
         if 'scheduler' in locals(): scheduler.stop()
         if 'monitor' in locals(): monitor.stop()
-        lock_util.release_lock('sender')
-        lock_util.release_lock('watcher')
+        lock_util.release_lock(lock_name)
+        # Watcher lock is handled by itself if run standalone, but here it's a thread.
+        # Since we use daemon thread, it dies with main.
+        # But we might want to release watcher lock if we acquired it?
+        # ReplyWatcher.__init__ acquires a lock!
+        # We should release it.
+        # watcher.lock_name is available if watcher initialized.
+        if 'watcher' in locals():
+            lock_util.release_lock(watcher.lock_name)
 
 if __name__ == "__main__":
     main()
