@@ -46,7 +46,7 @@ TOKEN_FILE = Path(__file__).parent / 'credentials' / 'token.json'
 SERVICE_ACCOUNT_FILE = Path(__file__).parent / 'credentials' / 'service_account.json'
 
 # Sheet names
-INPUT_SHEET_NAME = "Ivy Bound - Campaign Leads"
+INPUT_SHEET_NAME = "Ivy Bound - Scraped Leads"
 REPLIES_SHEET_NAME = "Ivy Bound - Reply Tracking"
 
 

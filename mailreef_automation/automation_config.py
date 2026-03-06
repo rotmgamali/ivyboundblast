@@ -60,7 +60,7 @@ if not MAILREEF_API_KEY:
 SUPPRESSION_SHEET_NAME = "Master Suppression List"
 
 CAMPAIGN_CONFIG = {
-    "sequence_length": 2,  # 2-email sequence
+    "sequence_length": 1,  # 1-email sequence (no follow-ups)
     "days_between_sequence": 4,  # Day 0, Day 4
     "max_retries": 3,
     "retry_delay_hours": 24,
@@ -77,7 +77,7 @@ WEEKEND_DAY_INDICES = [5, 6]  # Sat-Sun
 # Inbox Indices: Slicing logic [start, end)
 CAMPAIGN_PROFILES = {
     "IVYBOUND": {
-        "input_sheet": "Ivy Bound - Campaign Leads",
+        "input_sheet": "Ivy Bound - Scraped Leads",
         "replies_sheet": "Ivy Bound - Reply Tracking",
         "replies_sheet_id": "1jeLkdufaMub4rylaPnoTQZwDiLpHmut5hcQQStl8UxI",
         "send_window_group": "default",

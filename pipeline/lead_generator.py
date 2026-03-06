@@ -36,7 +36,7 @@ TEXAS_CITIES = [
 ]
 
 MAX_LEAD_LIMIT = 50000
-SHEET_NAME = "Ivy Bound - Campaign Leads"
+SHEET_NAME = "Ivy Bound - Scraped Leads"
 PIPELINE_DIR = Path(__file__).resolve().parent
 SCRAPER_SCRIPT = PIPELINE_DIR / "google_maps_scraper.py"
 
