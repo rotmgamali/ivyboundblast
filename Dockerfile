@@ -26,5 +26,5 @@ COPY . .
 # Create logs directory
 RUN mkdir -p mailreef_automation/logs
 
-# The entrypoint will be overridden by docker-compose for different services
-CMD ["python", "mailreef_automation/main.py", "--profile", "WEB4GURU_ACCOUNTANTS"]
+# Launch Ivybound: Lead Generator + Email Sender
+CMD ["bash", "start_ivybound.sh"]
