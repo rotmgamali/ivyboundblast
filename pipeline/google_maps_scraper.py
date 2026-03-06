@@ -62,6 +62,7 @@ class GoogleMapsScraper:
     def __init__(self, headless: bool = True, sheet_name: str = None):
         self.headless = headless
         self.seen_leads: Set[str] = set()
+        self.batched_leads: List[Dict] = []
         self.sheets_client = None
         self.csv_file = Path("scraped_leads.csv")
         
@@ -596,6 +597,9 @@ class GoogleMapsScraper:
                     logger.error(f"Error processing query {query}: {e}")
                 
             await browser.close()
+            
+            # Flush any final batched leads to the sheet
+            self._flush_leads()
 
     def _is_duplicate(self, name, phone, website):
         if name and name.lower().strip() in self.seen_leads: return True
@@ -622,11 +626,15 @@ class GoogleMapsScraper:
         return ""
 
     def _save_lead(self, data):
-        """Append to Google Sheet or CSV."""
+        """Buffer lead for batch processing or append to CSV immediately."""
+        self._update_seen(data)
+        
         if self.sheets_client:
-            success = self.sheets_client.add_lead(data)
-            if success:
-                self._update_seen(data)
+            self.batched_leads.append(data)
+            
+            # Flush every 25 leads to keep regular cadence but avoid rate limits
+            if len(self.batched_leads) >= 25:
+                self._flush_leads()
         else:
             # CSV Fallback
             try:
@@ -660,6 +668,20 @@ class GoogleMapsScraper:
                 self._update_seen(data)
             except Exception as e:
                 logger.error(f"Failed to save to CSV: {e}")
+
+    def _flush_leads(self):
+        """Batch insert leads to Google Sheets."""
+        if self.sheets_client and self.batched_leads:
+            try:
+                success = self.sheets_client.add_leads_batch(self.batched_leads)
+                if success:
+                    logger.info(f"Successfully flushed {len(self.batched_leads)} leads to Sheets.")
+                else:
+                    logger.error(f"Failed to flush {len(self.batched_leads)} leads to Sheets.")
+            except Exception as e:
+                logger.error(f"Error during _flush_leads: {e}")
+            finally:
+                self.batched_leads = [] # Clear the batch to avoid duplicates
 
     def _update_seen(self, data):
         """Add to seen set to prevent duplicates in same run."""

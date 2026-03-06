@@ -329,6 +329,84 @@ class GoogleSheetsClient:
         })
         
         logger.info("✓ Set up replies sheet headers")
+
+    # ==========================================
+    # DATA INGESTION
+    # ==========================================
+    
+    @retry_on_quota
+    def add_lead(self, data: Dict[str, Any]) -> bool:
+        """Add a single lead to the bottom of the input sheet."""
+        if not self.input_sheet:
+            self.setup_sheets()
+            
+        worksheet = self.input_sheet.sheet1
+        
+        # Exact header lineup based on _setup_input_sheet_headers
+        row = [
+            data.get("email", ""),
+            data.get("first_name", ""),
+            data.get("last_name", ""),
+            data.get("role", ""),
+            data.get("school_name", ""),
+            data.get("school_type", ""),
+            data.get("domain", ""),
+            data.get("state", ""),
+            data.get("city", ""),
+            str(data.get("phone", "")),
+            data.get("status", "pending"),
+            data.get("email_1_sent_at", ""),
+            data.get("email_2_sent_at", ""),
+            data.get("sender_email", ""),
+            data.get("notes", ""),
+            data.get("custom_data", "")
+        ]
+        
+        try:
+            worksheet.append_row(row, value_input_option='USER_ENTERED')
+            logger.info(f"💾 Added new lead: {data.get('email')} ({data.get('school_name')})")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add lead {data.get('email')}: {e}")
+            return False
+
+    @retry_on_quota
+    def add_leads_batch(self, leads_data: List[Dict[str, Any]]) -> bool:
+        """Batch insert leads to reduce write rate limit pressure."""
+        if not leads_data: return True
+        if not self.input_sheet:
+            self.setup_sheets()
+            
+        worksheet = self.input_sheet.sheet1
+        
+        rows = []
+        for data in leads_data:
+            rows.append([
+                data.get("email", ""),
+                data.get("first_name", ""),
+                data.get("last_name", ""),
+                data.get("role", ""),
+                data.get("school_name", ""),
+                data.get("school_type", ""),
+                data.get("domain", ""),
+                data.get("state", ""),
+                data.get("city", ""),
+                str(data.get("phone", "")),
+                data.get("status", "pending"),
+                data.get("email_1_sent_at", ""),
+                data.get("email_2_sent_at", ""),
+                data.get("sender_email", ""),
+                data.get("notes", ""),
+                data.get("custom_data", "")
+            ])
+            
+        try:
+            worksheet.append_rows(rows, value_input_option='USER_ENTERED')
+            logger.info(f"💾 Batch added {len(rows)} leads successfully.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to batch add leads: {e}")
+            return False
     
     def get_pending_leads(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Get leads that haven't been contacted yet."""
