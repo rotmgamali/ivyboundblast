@@ -240,8 +240,8 @@ class EmailScheduler:
                 inboxes = self.mailreef.get_inboxes()
                 new_map = {}
                 for ibx in inboxes:
-                    # differnet schemas/fields sometimes
-                    email = ibx.get('email') or ibx.get('address')
+                    # Mailreef API returns the email in the 'id' field
+                    email = ibx.get('id')
                     if email:
                         new_map[str(ibx['id'])] = email
                 

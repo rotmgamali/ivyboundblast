@@ -115,7 +115,8 @@ class ReplyWatcher:
             campaign_list = all_inboxes[start:end]
             
             for f in campaign_list:
-                email = f.get("email", "").lower().strip()
+                # Mailreef API returns the email address in the 'id' field
+                email = f.get("id", "").lower().strip()
                 if email:
                     self.campaign_inboxes.add(email)
             
