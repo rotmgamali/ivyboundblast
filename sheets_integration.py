@@ -231,7 +231,12 @@ class GoogleSheetsClient:
             
             # HARDENING: Check if empty and add headers
             worksheet = self.input_sheet.sheet1
-            if not worksheet.get_all_values():
+            values = worksheet.get_all_values()
+            
+            # A completely blank sheet returns [[]] or []
+            is_empty = not values or not any(str(cell).strip() for cell in values[0])
+            
+            if is_empty:
                 logger.info("Sheet is empty. Adding headers...")
                 self._setup_input_sheet_headers()
         except gspread.SpreadsheetNotFound:
