@@ -644,8 +644,8 @@ class GoogleMapsScraper:
         if self.sheets_client:
             self.batched_leads.append(data)
             
-            # Flush every 25 leads to keep regular cadence but avoid rate limits
-            if len(self.batched_leads) >= 25:
+            # Flush frequently to give immediate visual feedback to the user on the sheet
+            if len(self.batched_leads) >= 5:
                 self._flush_leads()
         else:
             # CSV Fallback
