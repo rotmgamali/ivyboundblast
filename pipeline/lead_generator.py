@@ -123,9 +123,9 @@ def run_pipeline(test_run: bool = False):
             logger.info("Test run complete. Exiting.")
             break
             
-        # Wait 5 to 10 minutes between queries to avoid Google Maps IP bans
-        delay_seconds = random.randint(300, 600)
-        logger.info(f"Subprocess finished. Anti-Bot delay: sleeping for {delay_seconds // 60} minutes before next query...")
+        # Wait 30 to 90 seconds between queries to avoid Google Maps IP bans
+        delay_seconds = random.randint(30, 90)
+        logger.info(f"Subprocess finished. Anti-Bot delay: sleeping for {delay_seconds} seconds before next query...")
         time.sleep(delay_seconds)
 
 if __name__ == "__main__":

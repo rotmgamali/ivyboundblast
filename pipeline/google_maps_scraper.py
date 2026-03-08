@@ -447,7 +447,7 @@ class GoogleMapsScraper:
                     
                     # We want to scroll until we have enough results or end of list
                     # For demo purposes, let's limit to top 20-30 to avoid getting blocked too fast initially
-                    max_scrolls = 10 
+                    max_scrolls = 30 
                     for i in range(max_scrolls):
                         # Scroll to bottom of feed
                         await feed.evaluate("element => element.scrollTop = element.scrollHeight")
@@ -461,7 +461,7 @@ class GoogleMapsScraper:
                         # Extract current count
                         cards = await feed.locator('div[role="article"]').count()
                         logger.info(f"Loaded {cards} results so far...")
-                        if cards >= 50: # Cap at 50 per query for this version
+                        if cards >= 120: # Drastically increased cap per query to pull maximum leads
                             break
                     
                     # Now extract data from cards
