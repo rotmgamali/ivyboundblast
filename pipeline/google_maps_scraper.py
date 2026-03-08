@@ -469,6 +469,9 @@ class GoogleMapsScraper:
                     count = await cards.count()
                     logger.info(f"Processing {count} results...")
                     
+                    stats_duplicates = 0
+                    stats_extracted = 0
+                    
                     for i in range(count):
                         try:
                             card = cards.nth(i)
@@ -522,10 +525,11 @@ class GoogleMapsScraper:
                             
                             # Check duplicates
                             if self._is_duplicate(name, phone, website_link):
-                                logger.info(f"Skipping duplicate: {name}")
+                                stats_duplicates += 1
+                                logger.debug(f"Skipping duplicate: {name}")
                                 continue
                             
-                            logger.info(f"Found: {name} | {phone} | {website_link}")
+                            logger.debug(f"Found: {name} | {phone} | {website_link}")
                             
                             # Extract Emails and Names if website exists
                             emails = []
@@ -537,7 +541,7 @@ class GoogleMapsScraper:
                             if website_link:
                                 extraction = await self._extract_emails_and_names(context, website_link, name)
                                 emails = extraction["emails"]
-                                logger.info(f"  Emails found: {emails}")
+                                logger.debug(f"  Emails found: {emails}")
                                 
                                 # Use website name if business name parse failed
                                 if not person_name["first"] and extraction["person"]["first"]:
@@ -576,7 +580,7 @@ class GoogleMapsScraper:
                             
                             # If no email survived verifiable checks, immediately discard the lead
                             if not primary_email:
-                                logger.warning(f"  Discarding lead '{name}' - 0 out of {len(emails)} emails were strictly valid. Results: {verification_results}")
+                                logger.debug(f"  Discarding lead '{name}' - 0 out of {len(emails)} emails were strictly valid.")
                                 continue
                                 
                             lead_data["email"] = primary_email
@@ -584,7 +588,8 @@ class GoogleMapsScraper:
                             lead_data["email_verified"] = "verified"
                             lead_data["status"] = "pending" # Ready for sending
                             
-                            logger.info(f"  Primary Email Verified: {primary_email}")
+                            stats_extracted += 1
+                            logger.info(f"[+] Verified Lead Extracted: {name} ({primary_email})")
                             lead_data["notes"] += f" Emails found: {len(emails)}. Results: {verification_results}"
                             
                             self._save_lead(lead_data)
@@ -595,6 +600,13 @@ class GoogleMapsScraper:
 
                 except Exception as e:
                     logger.error(f"Error processing query {query}: {e}")
+                
+                logger.info(f"==================================================")
+                logger.info(f"✅ QUERY COMPLETE: {query}")
+                logger.info(f"📊 Processed: {count if 'count' in locals() else 0} google map pins")
+                logger.info(f"🔄 Duplicates Skipped: {stats_duplicates if 'stats_duplicates' in locals() else 0}")
+                logger.info(f"✨ Verified Leads Extracted: {stats_extracted if 'stats_extracted' in locals() else 0}")
+                logger.info(f"==================================================")
                 
             await browser.close()
             

@@ -105,14 +105,14 @@ class EmailGenerator:
         """
         role = (lead_data.get("role") or "").lower()
         archetype = self._get_archetype(role)
-        _logger.info(f"🎯 [GEN] {campaign_type.upper()} Archetype: {archetype} (detected from role: '{role}')")
+        _logger.debug(f"🎯 [GEN] {campaign_type.upper()} Archetype: {archetype} (detected from role: '{role}')")
         
         # Load Template
         template_content = self._load_template_file(campaign_type, archetype, sequence_number)
         
         # Fallback to general if not found and archetype isn't already general
         if not template_content and archetype != "general":
-            _logger.info(f"ℹ️ Template for {archetype}/{sequence_number} not found. Falling back to general.")
+            _logger.debug(f"ℹ️ Template for {archetype}/{sequence_number} not found. Falling back to general.")
             template_content = self._load_template_file(campaign_type, "general", sequence_number)
             
         if not template_content:
@@ -129,7 +129,7 @@ class EmailGenerator:
                 self.logger.warning(f"⚠️ Skipping scrape for Google URL: {url}")
                 website_content = "Scraper skipped for Google URL."
             else:
-                self.logger.info(f"🌍 [SCRAPE] Attempting to scrape {campaign_type} site: {url}...")
+                self.logger.debug(f"🌍 [SCRAPE] Attempting to scrape {campaign_type} site: {url}...")
                 try:
                     if not url.startswith("http"):
                         url = "https://" + url
@@ -143,7 +143,7 @@ class EmailGenerator:
                         website_content = "Scraper unavailable."
 
                     if website_content and len(website_content) > 100:
-                        self.logger.info(f"✅ [SCRAPE SUCCESS] Found {len(website_content)} characters for personalization.")
+                        self.logger.debug(f"✅ [SCRAPE SUCCESS] Found {len(website_content)} characters for personalization.")
                     else:
                         self.logger.warning(f"⚠️ [SCRAPE WEAK] Only found {len(website_content) if website_content else 0} chars.")
                 except Exception as e:
@@ -173,7 +173,7 @@ class EmailGenerator:
                 
                 if context_parts:
                     custom_context = "\n".join(context_parts)
-                    self.logger.info(f"✅ [DATA] Extracted rich personalization details: {len(context_parts)} items.")
+                    self.logger.debug(f"✅ [DATA] Extracted rich personalization details: {len(context_parts)} items.")
         except Exception as e:
             self.logger.warning(f"⚠️ Failed to parse custom_data: {e}")
 

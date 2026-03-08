@@ -88,6 +88,7 @@ def run_pipeline(test_run: bool = False):
             city_idx += 1
             
         logger.info(f"Starting Scraper subprocess for query: '{query}'")
+        start_time = time.time()
         
         # 3. Run scraper
         try:
@@ -108,12 +109,17 @@ def run_pipeline(test_run: bool = False):
             )
             
             for line in process.stdout:
-                print(f"[SCRAPER] {line.strip()}")
+                # Scraper already has its own standard logging format
+                sys.stdout.write(line)
+                sys.stdout.flush()
                 
             process.wait()
             
+            elapsed = time.time() - start_time
             if process.returncode != 0:
-                logger.error(f"Scraper returned non-zero exit code: {process.returncode}")
+                logger.error(f"Scraper returned non-zero exit code {process.returncode} after {elapsed:.2f}s")
+            else:
+                logger.info(f"Scraper completed successfully in {elapsed:.2f} seconds.")
                 
         except Exception as e:
             logger.error(f"Error running scraper subprocess: {e}")

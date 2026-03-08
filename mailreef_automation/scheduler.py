@@ -354,7 +354,7 @@ class EmailScheduler:
                     body_text,
                     f"--- BODY END ---"
                 ]
-                self.logger.info("\n".join(log_msg))
+                self.logger.debug("\n".join(log_msg))
                 
                 # --- NUCLEAR OPTION: LOCK-BEFORE-SEND ---
                 # Record in suppression BEFORE the API call. 
