@@ -717,5 +717,13 @@ if __name__ == "__main__":
         print("Please provide at least one query with --queries")
         sys.exit(1)
         
+    # Process queries that may be piped together like "Query 1 | Query 2"
+    processed_queries = []
+    for q in args.queries:
+        if " | " in q:
+            processed_queries.extend([sub_q.strip() for sub_q in q.split(" | ") if sub_q.strip()])
+        else:
+            processed_queries.append(q)
+            
     scraper = GoogleMapsScraper(headless=args.headless, sheet_name=args.sheet_name)
-    asyncio.run(scraper.run(args.queries))
+    asyncio.run(scraper.run(processed_queries))

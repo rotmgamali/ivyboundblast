@@ -76,18 +76,23 @@ def run_pipeline(test_run: bool = False):
             time.sleep(60 * 60 * 6) # Sleep for 6 hours
             continue
             
-        # 2. Prepare query
-        city = TEXAS_CITIES[city_idx % len(TEXAS_CITIES)]
-        school_type = SCHOOL_TYPES[type_idx % len(SCHOOL_TYPES)]
+        # Batched queries to keep browser open and eliminate start/stop overhead
+        batch_size = 5
+        queries = []
         
-        query = f"{school_type} in {city}, TX"
-        
-        # Advance counters: rotate school types first, then cities
-        type_idx += 1
-        if type_idx % len(SCHOOL_TYPES) == 0:
-            city_idx += 1
+        for _ in range(batch_size):
+            city = TEXAS_CITIES[city_idx % len(TEXAS_CITIES)]
+            school_type = SCHOOL_TYPES[type_idx % len(SCHOOL_TYPES)]
+            queries.append(f"{school_type} in {city}, TX")
             
-        logger.info(f"Starting Scraper subprocess for query: '{query}'")
+            # Advance counters
+            type_idx += 1
+            if type_idx % len(SCHOOL_TYPES) == 0:
+                city_idx += 1
+        
+        batch_query_string = " | ".join(queries)
+        
+        logger.info(f"Starting Scraper Subprocess Batch: {batch_query_string}")
         start_time = time.time()
         
         # 3. Run scraper
@@ -95,7 +100,7 @@ def run_pipeline(test_run: bool = False):
             # We run via subprocess to isolate memory and playwright event loops
             cmd = [
                 sys.executable, str(SCRAPER_SCRIPT),
-                "--queries", query,
+                "--queries", batch_query_string,
                 "--sheet-name", SHEET_NAME
             ]
             
@@ -119,7 +124,7 @@ def run_pipeline(test_run: bool = False):
             if process.returncode != 0:
                 logger.error(f"Scraper returned non-zero exit code {process.returncode} after {elapsed:.2f}s")
             else:
-                logger.info(f"Scraper completed successfully in {elapsed:.2f} seconds.")
+                logger.info(f"Scraper Batch completed successfully in {elapsed:.2f} seconds.")
                 
         except Exception as e:
             logger.error(f"Error running scraper subprocess: {e}")
@@ -129,8 +134,8 @@ def run_pipeline(test_run: bool = False):
             logger.info("Test run complete. Exiting.")
             break
             
-        # Wait 30 to 90 seconds between queries to avoid Google Maps IP bans
-        delay_seconds = random.randint(30, 90)
+        # Wait moderately since we just hit Google 5 times in a row
+        delay_seconds = random.randint(15, 45)
         logger.info(f"Subprocess finished. Anti-Bot delay: sleeping for {delay_seconds} seconds before next query...")
         time.sleep(delay_seconds)
 
