@@ -31,6 +31,12 @@ def verify_email_millionverifier(email: str) -> dict:
             if data.get('role', False):
                 return {"valid": False, "reason": f"role_based ({subresult})"}
             return {"valid": True, "reason": "ok"}
+        elif result == 'error':
+            error_msg = data.get('error', 'unknown API error')
+            if 'Insufficient credits' in error_msg:
+                logger.error(f"FATAL: MillionVerifier Out of Credits! Cannot continue verification.")
+                raise Exception("MillionVerifier Out of Credits")
+            return {"valid": False, "reason": f"error: {error_msg}"}
         else:
             return {"valid": False, "reason": f"{result} ({subresult})"}
             
