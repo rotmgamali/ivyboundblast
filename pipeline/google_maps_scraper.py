@@ -565,22 +565,23 @@ class GoogleMapsScraper:
                                 "custom_data": {} # Will hold {email: verification_status}
                             }
 
-                            # Verify all emails found
+                            # Verify all emails found (cap at top 5 to avoid infinite loops on directories)
                             verification_results = {}
                             primary_email = ""
                             
-                            for email in emails:
+                            for email in emails[:5]:
                                 v_result = verify_email_bulk(email)
                                 status = "verified" if v_result["valid"] else f"invalid ({v_result['reason']})"
                                 verification_results[email] = status
                                 
                                 # Strict Upload Logic: Only keep perfectly valid emails
-                                if v_result["valid"] and not primary_email:
+                                if v_result["valid"]:
                                     primary_email = email
+                                    break  # SPEED FIX: We only need ONE good email to send a campaign! Stop checking.
                             
                             # If no email survived verifiable checks, immediately discard the lead
                             if not primary_email:
-                                logger.debug(f"  Discarding lead '{name}' - 0 out of {len(emails)} emails were strictly valid.")
+                                logger.debug(f"  Discarding lead '{name}' - 0 out of {len(emails[:5])} checked emails were valid.")
                                 continue
                                 
                             lead_data["email"] = primary_email
