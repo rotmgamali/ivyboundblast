@@ -49,7 +49,7 @@ except ImportError:
         logger.error("Could not import GoogleSheetsClient from sheets_integration.py")
         sys.exit(1)
 
-from million_verifier import verify_email_millionverifier
+from bulk_email_checker import verify_email_bulk
 
 # Regex for email extraction
 EMAIL_REGEX = re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')
@@ -566,7 +566,7 @@ class GoogleMapsScraper:
                             primary_email = ""
                             
                             for email in emails:
-                                v_result = verify_email_millionverifier(email)
+                                v_result = verify_email_bulk(email)
                                 status = "verified" if v_result["valid"] else f"invalid ({v_result['reason']})"
                                 verification_results[email] = status
                                 
