@@ -347,7 +347,14 @@ class GoogleSheetsClient:
     
     @retry_on_quota
     def add_lead(self, data: Dict[str, Any]) -> bool:
-        """Add a single lead to the bottom of the input sheet."""
+        """Add a single lead to the bottom of the input sheet.
+        
+        SAFETY NET: Only verified leads are written to the sheet.
+        """
+        if data.get("email_verified", "").lower() != "verified":
+            logger.warning(f"🚫 [SHEET GATE] Blocked unverified single lead: {data.get('email', 'N/A')}")
+            return False
+        
         if not self.input_sheet:
             self.setup_sheets()
             
@@ -383,15 +390,34 @@ class GoogleSheetsClient:
 
     @retry_on_quota
     def add_leads_batch(self, leads_data: List[Dict[str, Any]]) -> bool:
-        """Batch insert leads to reduce write rate limit pressure."""
+        """Batch insert leads to reduce write rate limit pressure.
+        
+        SAFETY NET: Only verified leads are written to the sheet.
+        Any lead without email_verified='verified' is silently dropped.
+        """
         if not leads_data: return True
         if not self.input_sheet:
             self.setup_sheets()
             
         worksheet = self.input_sheet.sheet1
         
+        # SAFETY NET: Filter out any unverified leads before writing
+        verified_leads = []
+        for lead in leads_data:
+            if lead.get("email_verified", "").lower() == "verified":
+                verified_leads.append(lead)
+            else:
+                logger.warning(f"🚫 [SHEET GATE] Blocked unverified lead from being added: {lead.get('email', 'N/A')} (status: {lead.get('email_verified', 'MISSING')})")
+        
+        if not verified_leads:
+            logger.warning(f"⚠️ Entire batch of {len(leads_data)} leads was unverified — nothing written to sheet.")
+            return True
+        
+        if len(verified_leads) < len(leads_data):
+            logger.info(f"🔒 Verification gate: {len(verified_leads)}/{len(leads_data)} leads passed verification check.")
+        
         rows = []
-        for data in leads_data:
+        for data in verified_leads:
             rows.append([
                 data.get("email", ""),
                 data.get("first_name", ""),
