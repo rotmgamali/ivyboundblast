@@ -101,12 +101,15 @@ class EmailScheduler:
             # Sort by ID to ensure consistent rotation order
             all_inboxes_raw.sort(key=lambda x: x['id'])
             
-            # HARDENING: Filter inboxes based on profile indices
-            start_idx, end_idx = self.profile_config.get("inbox_indices", (0, 9999))
-            # Safety: Ensure indices are within bounds
-            all_inboxes = all_inboxes_raw[start_idx:end_idx]
-            
-            self.logger.info(f"🛡️ [HARDENING] Inbox partition: Using indices {start_idx}-{end_idx} (Total: {len(all_inboxes)} inboxes)")
+            # HARDENING: Filter inboxes based on profile server_filter or indices
+            server_filter = self.profile_config.get("server_filter")
+            if server_filter:
+                all_inboxes = [i for i in all_inboxes_raw if i.get('server') == server_filter]
+                self.logger.info(f"🛡️ [HARDENING] Server filter: Using {server_filter} (Total: {len(all_inboxes)} inboxes)")
+            else:
+                start_idx, end_idx = self.profile_config.get("inbox_indices", (0, 9999))
+                all_inboxes = all_inboxes_raw[start_idx:end_idx]
+                self.logger.info(f"🛡️ [HARDENING] Inbox partition: Using indices {start_idx}-{end_idx} (Total: {len(all_inboxes)} inboxes)")
             
         except Exception as e:
             print(f"Failed to fetch inboxes: {e}")

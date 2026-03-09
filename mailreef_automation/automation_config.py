@@ -86,7 +86,8 @@ CAMPAIGN_PROFILES = {
         "template_dir": "templates",
         "campaign_type": "school",
         "opt_out_url": "https://ivybound.net/opt-out",
-        "subject_patterns": ["Quick question about"]
+        "subject_patterns": ["Quick question about"],
+        "server_filter": "errorskin"
     },
     "STRATEGY_B": {
         "input_sheet": "Web4Guru - Campaign Leads",
@@ -103,7 +104,8 @@ CAMPAIGN_PROFILES = {
             "operations": ["operations", "coo", "manager", "principal"]
         },
         "opt_out_url": "https://web4guru.com/opt-out",
-        "subject_patterns": ["Question for", "AI tools"]
+        "subject_patterns": ["Question for", "AI tools"],
+        "server_filter": "birdsgeese"
     },
     "WEB4GURU_ACCOUNTANTS": {
         "input_sheet": "Web4Guru Accountants - Campaign Leads",
@@ -117,7 +119,8 @@ CAMPAIGN_PROFILES = {
         "reply_prompt": "prompts/web4guru_accountant_reply.txt",
         "auto_reply_template": "b2b/general/email_2.txt",
         "opt_out_url": "https://web4guru.com/opt-out",
-        "subject_patterns": ["Inquiry", "Question", "Growth /"]
+        "subject_patterns": ["Inquiry", "Question", "Growth /"],
+        "server_filter": "errorskin"
     }
 }
 
