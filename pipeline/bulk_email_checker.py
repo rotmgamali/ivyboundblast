@@ -72,12 +72,16 @@ def verify_email_bulk(email: str, retries=1) -> dict:
             details = data.get('details', '')
             
             if status == 'passed':
+                # For school outreach, role accounts (admissions@, office@) ARE our targets
+                # Don't reject them — they're read by decision-makers at small schools
                 if data.get('isRoleAccount', False):
-                    return {"valid": False, "reason": f"role_based ({details})"}
+                    logger.info(f"📋 Role account accepted for school outreach: {email}")
                 return {"valid": True, "reason": "passed"}
             elif status == 'failed':
+                logger.info(f"❌ Email verification FAILED: {email} — {details}")
                 return {"valid": False, "reason": f"failed: {details}"}
             else:
+                logger.info(f"⚠️ Email verification unclear: {email} — {status}: {details}")
                 return {"valid": False, "reason": f"{status} ({details})"}
                 
         except Exception as e:

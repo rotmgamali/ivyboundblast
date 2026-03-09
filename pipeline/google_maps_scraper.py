@@ -587,7 +587,7 @@ class GoogleMapsScraper:
                             if website_link:
                                 extraction = await self._extract_emails_and_names(context, website_link, name)
                                 emails = extraction["emails"]
-                                logger.debug(f"  Emails found: {emails}")
+                                logger.info(f"  📧 {name}: found {len(emails)} emails from {website_link}")
                                 
                                 # Use website name if business name parse failed
                                 if not person_name["first"] and extraction["person"]["first"]:
@@ -639,7 +639,7 @@ class GoogleMapsScraper:
                             
                             # If no email survived verifiable checks, immediately discard the lead
                             if not primary_email:
-                                logger.debug(f"  Discarding lead '{name}' - 0 out of {len(emails[:5])} checked emails were valid.")
+                                logger.info(f"  🗑️ Discarding '{name}' - 0/{len(emails[:5])} emails were valid")
                                 continue
                                 
                             lead_data["email"] = primary_email
