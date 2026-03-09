@@ -458,17 +458,20 @@ class GoogleSheetsClient:
             sm = None
 
         pending = []
+        suppressed_count = 0
         for record in all_records:
             if record.get('status', '').lower() in ['', 'pending']:
                 email = record.get('email', '').lower().strip()
                 if sm and email and sm.is_suppressed(email):
-                    logger.warning(f"🚫 [HARD FILTER] Skipping suppressed lead found in pending list: {email}")
+                    suppressed_count += 1
                     continue
                 pending.append(record)
             
             if len(pending) >= limit:
                 break
         
+        if suppressed_count > 0:
+            logger.info(f"🔇 Skipped {suppressed_count} already-contacted leads in sheet")
         logger.info(f"Found {len(pending)} pending leads (returning up to {limit})")
         return pending
     

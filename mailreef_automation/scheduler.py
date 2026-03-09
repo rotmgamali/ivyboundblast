@@ -57,6 +57,7 @@ class EmailScheduler:
         self._followup_cache = {} # inbox_id -> list
         self._last_cache_update = datetime.min
         self._last_followup_update = datetime.min
+        self._cache_dry = False  # True when sheet has no pending leads (forces TTL respect)
         self.CACHE_TTL = timedelta(minutes=5)
         self.FOLLOWUP_CACHE_TTL = timedelta(minutes=10)
         
@@ -198,25 +199,33 @@ class EmailScheduler:
         """Refresh local lead cache if expired or empty"""
         with self._cache_lock:
             now = datetime.now()
-            if not self._lead_cache or (now - self._last_cache_update) > self.CACHE_TTL:
-                self.logger.info("🔄 Refreshing Stage 1 lead cache...")
-                try:
-                    # Use sheets_integration's fetch_all_records (which is also cached)
-                    new_batch = self.sheets.get_pending_leads(limit=50) 
-                    
-                    if new_batch:
-                        self._lead_cache = new_batch
-                        self._last_cache_update = now
-                        self.logger.info(f"✅ Cached {len(new_batch)} fresh Stage 1 leads.")
-                    else:
-                        # BACKOFF: Set update time so we don't re-scan immediately
-                        # The scraper will add new leads to the sheet; we'll find them on next TTL expiry
-                        self._last_cache_update = now
-                        self.logger.warning("⚠️ No pending leads found. Waiting for scraper to add new leads (next check in 5 min)...")
-                except Exception as e:
-                    # Log only the first line of the error to avoid 429 flood noise
-                    self._last_cache_update = now  # Backoff on error too
-                    self.logger.error(f"❌ Lead cache refresh failed: {str(e).splitlines()[0]}")
+            ttl_expired = (now - self._last_cache_update) > self.CACHE_TTL
+            
+            # Only refresh if TTL expired. When cache is dry (no pending leads),
+            # we MUST respect the TTL to avoid hammering the Sheets API.
+            if not ttl_expired:
+                return
+            
+            # Also skip if cache has items and TTL hasn't expired
+            if self._lead_cache and not ttl_expired:
+                return
+                
+            self.logger.info("🔄 Refreshing Stage 1 lead cache...")
+            try:
+                new_batch = self.sheets.get_pending_leads(limit=50) 
+                self._last_cache_update = now  # ALWAYS update timestamp
+                
+                if new_batch:
+                    self._lead_cache = new_batch
+                    self._cache_dry = False
+                    self.logger.info(f"✅ Cached {len(new_batch)} fresh Stage 1 leads.")
+                else:
+                    self._lead_cache = []
+                    self._cache_dry = True
+                    self.logger.info("⏳ No pending leads. Scraper is working — next check in 5 min.")
+            except Exception as e:
+                self._last_cache_update = now  # Backoff on error too
+                self.logger.error(f"❌ Lead cache refresh failed: {str(e).splitlines()[0]}")
 
     def _refresh_followup_cache_if_needed(self, sender_email, inbox_id):
         """Refresh local follow-up cache for a specific sender"""
