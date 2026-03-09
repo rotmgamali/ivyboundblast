@@ -374,8 +374,17 @@ class GoogleMapsScraper:
 
     async def run(self, specific_queries: List[str] = None):
         async with async_playwright() as p:
-            # Launch browser
-            browser = await p.chromium.launch(headless=self.headless)
+            # Launch browser with explicit low-memory and Docker-safe flags to prevent Railway OOM restarts
+            browser = await p.chromium.launch(
+                headless=self.headless,
+                args=[
+                    '--disable-dev-shm-usage',
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-gpu',
+                    '--disable-software-rasterizer'
+                ]
+            )
             context = await browser.new_context(
                 viewport={'width': 1280, 'height': 800},
                 user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
