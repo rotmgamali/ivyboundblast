@@ -99,7 +99,7 @@ def run_pipeline(test_run: bool = False):
         try:
             # We run via subprocess to isolate memory and playwright event loops
             cmd = [
-                sys.executable, str(SCRAPER_SCRIPT),
+                sys.executable, "-u", str(SCRAPER_SCRIPT),
                 "--queries", batch_query_string,
                 "--sheet-name", SHEET_NAME
             ]
