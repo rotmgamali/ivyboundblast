@@ -77,7 +77,7 @@ WEEKEND_DAY_INDICES = [5, 6]  # Sat-Sun
 # Inbox Indices: Slicing logic [start, end)
 CAMPAIGN_PROFILES = {
     "IVYBOUND": {
-        "input_sheet": "Ivy Bound - Scraped Leads",
+        "input_sheet": "Ivy Bound - Campaign Leads",
         "replies_sheet": "Ivy Bound - Reply Tracking",
         "replies_sheet_id": "1jeLkdufaMub4rylaPnoTQZwDiLpHmut5hcQQStl8UxI",
         "send_window_group": "default",

@@ -14,6 +14,7 @@ try:
     
     if inboxes:
         print(f"Total inboxes: {len(inboxes)}")
+        print(f"SAMPLE INBOX: {inboxes[0]}")
         errorskin_indices = [i for i, x in enumerate(inboxes) if x.get('server') == 'errorskin']
         birdsgeese_indices = [i for i, x in enumerate(inboxes) if x.get('server') == 'birdsgeese']
         
