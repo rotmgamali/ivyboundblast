@@ -246,44 +246,52 @@ class ReplyWatcher:
                     if msg_dt <= since_dt:
                         continue
                     
-                    # FILTER: Skip warmup emails
+                    # FILTER 1: Skip warmup emails (but known leads always pass)
                     if self.is_warmup(from_email, subject):
                         continue
 
-                    # STRICT FILTER: Only allow campaign-specific subject lines
-                    reply_subject = subject.lower().replace('re:', '').replace('fwd:', '').strip()
-                    known_fragments = [
-                        "quick question", "supporting families", "boosting enrollment", 
-                        "academic outcomes", "differentiation", "merit scholarship",
-                        "college readiness", "student-athletes", "test prep", 
-                        "enhancing value", "families and college prep"
-                    ]
-                    if not any(frag in reply_subject for frag in known_fragments):
-                        logger.debug(f"⏭️ [SKIP] Subject did not match known campaign fragments: {subject}")
-                        continue
-
-                    # FILTER: Skip if not for this campaign's inboxes
-                    to_email = msg.get("to")[0] if msg.get("to") else "unknown"
-                    if self.campaign_inboxes and to_email.lower().strip() not in self.campaign_inboxes:
-                        # logger.debug(f"⏭️ [SKIP] Message for {to_email} does not belong to {self.profile_name}")
-                        continue
-
-                    # --- REFINED FILTER: SUBJECT PATTERN MATCHING ---
-                    profile_config = automation_config.CAMPAIGN_PROFILES[self.profile_name]
-                    subject_patterns = profile_config.get("subject_patterns", [])
+                    # ========== LEAD-FIRST PRIORITY ==========
+                    # If the sender is a known lead, ALWAYS accept the reply.
+                    # Skip inbox partition and subject pattern checks entirely.
+                    is_known_lead = from_email in self.lead_emails
+                    if not is_known_lead and '@' in from_email:
+                        sender_domain = from_email.split('@')[-1]
+                        if sender_domain in self.lead_domains:
+                            is_known_lead = True
                     
-                    is_lead = from_email in self.lead_emails
-                    
-                    if subject_patterns and not is_lead:
-                        # Clean subject of prefixes for accurate "Starts With" check
-                        clean_subject = re.sub(r'^(Re|Fwd|RE|FWD):\s*', '', subject, flags=re.IGNORECASE).strip()
+                    if is_known_lead:
+                        logger.info(f"📬 [LEAD REPLY] Accepting reply from known lead: {from_email} — Subject: {subject}")
+                    else:
+                        # NON-LEAD: Apply strict subject + inbox filtering
                         
-                        # Use starts-with to prevent "Question" matching "Quick question"
-                        matches_pattern = any(clean_subject.lower().startswith(p.lower()) for p in subject_patterns)
-                        
-                        if not matches_pattern:
-                            # logger.debug(f"🗑️ [FILTER] Unrelated subject pattern: '{subject}' (Profile: {self.profile_name})")
+                        # FILTER 2: Subject fragment matching
+                        reply_subject = subject.lower().replace('re:', '').replace('fwd:', '').strip()
+                        known_fragments = [
+                            "quick question", "supporting families", "boosting enrollment", 
+                            "academic outcomes", "differentiation", "merit scholarship",
+                            "college readiness", "student-athletes", "test prep", 
+                            "enhancing value", "families and college prep"
+                        ]
+                        if not any(frag in reply_subject for frag in known_fragments):
+                            logger.debug(f"⏭️ [SKIP] Non-lead subject didn't match campaign fragments: {subject}")
                             continue
+
+                        # FILTER 3: Inbox partition (only for non-leads)
+                        to_email = msg.get("to")[0] if msg.get("to") else "unknown"
+                        if self.campaign_inboxes and to_email.lower().strip() not in self.campaign_inboxes:
+                            logger.debug(f"⏭️ [SKIP] Non-lead reply to {to_email} — not in {self.profile_name} partition")
+                            continue
+
+                        # FILTER 4: Subject pattern matching (only for non-leads)
+                        profile_config = automation_config.CAMPAIGN_PROFILES[self.profile_name]
+                        subject_patterns = profile_config.get("subject_patterns", [])
+                        
+                        if subject_patterns:
+                            clean_subject = re.sub(r'^(Re|Fwd|RE|FWD):\s*', '', subject, flags=re.IGNORECASE).strip()
+                            matches_pattern = any(clean_subject.lower().startswith(p.lower()) for p in subject_patterns)
+                            if not matches_pattern:
+                                logger.debug(f"⏭️ [SKIP] Non-lead subject pattern mismatch: '{subject}'")
+                                continue
 
                     # Normalize keys for the rest of the script
                     msg["from_email"] = msg.get("from_email")
