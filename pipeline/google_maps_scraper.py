@@ -146,31 +146,66 @@ class GoogleMapsScraper:
         for pattern in patterns:
             match = re.search(pattern, business_name, re.I)
             if match:
-                return {"first": match.group(1), "last": match.group(2)}
+                return {"first": match.group(1), "last": match.group(2), "role": ""}
         
-        return {"first": "", "last": ""}
+        return {"first": "", "last": "", "role": ""}
 
     async def _extract_person_from_website(self, page: Page) -> Dict[str, str]:
         """
-        Scans a page for names associated with legal titles.
+        Scans a page for names associated with leadership titles.
         """
         try:
             content = await page.content()
-            # Look for "Attorney John Smith", "Partner Jane Doe", etc.
-            titles = ["Attorney", "Partner", "Founder", "Principal", "Counsel"]
+            # Look for "Principal John Smith", "Director Jane Doe", etc.
+            titles = ["Principal", "Director", "Dean", "Superintendent", "Head of School", "Administrator", "Coordinator", "Founder"]
             for title in titles:
                 pattern = rf"{title}\s+([A-Z][a-z]+)\s+([A-Z][a-z]+)"
                 match = re.search(pattern, content)
                 if match:
-                    return {"first": match.group(1), "last": match.group(2)}
+                    return {"first": match.group(1), "last": match.group(2), "role": title}
         except:
             pass
-        return {"first": "", "last": ""}
+        return {"first": "", "last": "", "role": ""}
+
+    def _score_emails(self, emails: List[str], person: Dict[str, str]) -> List[str]:
+        """
+        Scores and sorts emails to prioritize leadership/decision-makers 
+        over generic inboxes (info@, contact@).
+        """
+        first_name = person.get("first", "").lower()
+        last_name = person.get("last", "").lower()
+        
+        scored_emails = []
+        for email in emails:
+            score = 3 # default: generic
+            
+            local_part = email.split('@')[0].lower()
+            
+            # Tier 1: Exact name match
+            if first_name and last_name:
+                if first_name in local_part or last_name in local_part or first_name[0] + last_name in local_part:
+                    score = 1
+                    
+            # Tier 2: Role-based leadership email
+            if score == 3:
+                role_keywords = ['principal', 'director', 'dean', 'admin', 'admissions', 'superintendent', 'head']
+                if any(kw in local_part for kw in role_keywords):
+                    score = 2
+                    
+            # Demote severe generic
+            if local_part in ['info', 'contact', 'hello', 'support']:
+                score = 4
+                
+            scored_emails.append((score, email))
+            
+        # Sort by score ascending (1 is best)
+        scored_emails.sort(key=lambda x: x[0])
+        return [e[1] for e in scored_emails]
 
     async def _extract_emails_and_names(self, context: BrowserContext, url: str, business_name: str) -> Dict:
         """Visit the website and extract emails and potential contact name."""
         emails = set()
-        person = {"first": "", "last": ""}
+        person = {"first": "", "last": "", "role": ""}
         page = None
         try:
             page = await context.new_page()
@@ -242,7 +277,8 @@ class GoogleMapsScraper:
             if 'wixpress' in email or 'sentry' in email or 'example' in email: continue
             valid_emails.append(email)
             
-        return {"emails": list(set(valid_emails)), "person": person}
+        sorted_emails = self._score_emails(valid_emails, person)
+        return {"emails": sorted_emails, "person": person}
 
     async def _old_extract_emails_from_website(self, context: BrowserContext, url: str) -> List[str]:
         """Visit the website and extract emails from homepage and contact page."""
@@ -542,7 +578,7 @@ class GoogleMapsScraper:
                             
                             # Extract Emails and Names if website exists
                             emails = []
-                            person_name = {"first": "", "last": ""}
+                            person_name = {"first": "", "last": "", "role": ""}
                             
                             # Initial guess from business name
                             person_name = self._extract_name_from_business(name)
@@ -555,14 +591,19 @@ class GoogleMapsScraper:
                                 # Use website name if business name parse failed
                                 if not person_name["first"] and extraction["person"]["first"]:
                                     person_name = extraction["person"]
+                                    
+                            # Determine Role
+                            lead_role = person_name.get("role", "")
+                            if not lead_role:
+                                lead_role = "School Administrator" if person_name["first"] else "Owner/Manager"
                             
                             # Save to Sheet/CSV
                             lead_data = {
                                 "business_name": name, 
                                 "first_name": person_name["first"],
                                 "last_name": person_name["last"],
-                                "role": "Attorney/Manager" if person_name["first"] else "Owner/Manager", 
-                                "business_type": "Law Firm",
+                                "role": lead_role, 
+                                "business_type": "School",
                                 "domain": website_link,
                                 "phone": phone,
                                 "email": "",
