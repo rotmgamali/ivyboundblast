@@ -584,8 +584,9 @@ class GoogleMapsScraper:
                                 logger.debug(f"  Discarding lead '{name}' - 0 out of {len(emails[:5])} checked emails were valid.")
                                 continue
                                 
+                            import json
                             lead_data["email"] = primary_email
-                            lead_data["custom_data"] = str(verification_results)
+                            lead_data["custom_data"] = json.dumps(verification_results)
                             lead_data["email_verified"] = "verified"
                             lead_data["status"] = "pending" # Ready for sending
                             
