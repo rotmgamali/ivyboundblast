@@ -518,24 +518,24 @@ class GoogleMapsScraper:
                     stats_duplicates = 0
                     stats_extracted = 0
                     
+                    # 1. Collect all cards and basic data first (Fast - No Browser Visits yet)
+                    lead_tasks = []
+                    
+                    # Parse city/state from the search query once for the whole batch
+                    _state_match = re.search(r',\s*([A-Z]{2})\s*$', query)
+                    _parsed_state = _state_match.group(1) if _state_match else ""
+                    _parsed_city = query.split(" in ")[-1].rsplit(",", 1)[0].strip() if " in " in query else ""
+
                     for i in range(count):
                         try:
                             card = cards.nth(i)
                             
-                            # Debug: Dump card HTML
-                            if i == 0 and not Path("card_debug.html").exists():
-                                with open("card_debug.html", "w") as f:
-                                    f.write(await card.inner_html())
-                            
                             # Extract Name
-                            # Try aria-label first
                             name = await card.get_attribute("aria-label")
                             if not name:
-                                # Try link
                                 link = card.locator("a").first
                                 name = await link.get_attribute("aria-label")
                             
-                            # Clean name
                             if name: 
                                 name = name.replace("Visit ", "").strip()
                             else:
@@ -543,13 +543,10 @@ class GoogleMapsScraper:
 
                             # Extract Website
                             website_link = ""
-                            # Look for 'Website' button/link
-                            # Usually a link with text "Website" or icon
                             website_btn = card.locator('a[data-value="Website"]')
                             if await website_btn.count() > 0:
                                 website_link = await website_btn.first.get_attribute("href")
                             else:
-                                # Try generic link search
                                 links = await card.locator("a").all()
                                 for link in links:
                                     href = await link.get_attribute("href")
@@ -560,102 +557,106 @@ class GoogleMapsScraper:
                             # Extract Phone
                             phone = ""
                             text_content = await card.text_content()
-                            # Regex for phone in text (e.g. (555) 123-4567 or +1 ...)
                             phone_match = re.search(r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', text_content)
                             if phone_match:
                                 phone = phone_match.group(0)
 
-                            # Address from text
-                            address = "" # Hard to parsing from raw text reliably without details, 
-                                         # but we can try to find the line with city/state
-                            
                             # Check duplicates
                             if self._is_duplicate(name, phone, website_link):
                                 stats_duplicates += 1
-                                logger.debug(f"Skipping duplicate: {name}")
                                 continue
                             
-                            logger.debug(f"Found: {name} | {phone} | {website_link}")
-                            
-                            # Extract Emails and Names if website exists
-                            emails = []
-                            person_name = {"first": "", "last": "", "role": ""}
-                            
-                            # Initial guess from business name
-                            person_name = self._extract_name_from_business(name)
-                            
-                            if website_link:
-                                extraction = await self._extract_emails_and_names(context, website_link, name)
-                                emails = extraction["emails"]
-                                logger.info(f"  📧 {name}: found {len(emails)} emails from {website_link}")
-                                
-                                # Use website name if business name parse failed
-                                if not person_name["first"] and extraction["person"]["first"]:
-                                    person_name = extraction["person"]
-                                    
-                            # Determine Role
-                            lead_role = person_name.get("role", "")
-                            if not lead_role:
-                                lead_role = "School Administrator" if person_name["first"] else "Owner/Manager"
-                            
-                            # Parse state from query (e.g. "Private schools in Houston, TX" -> "TX")
-                            _state_match = re.search(r',\s*([A-Z]{2})\s*$', query)
-                            _parsed_state = _state_match.group(1) if _state_match else ""
-                            _parsed_city = query.split(" in ")[-1].rsplit(",", 1)[0].strip() if " in " in query else ""
-                            
-                            # Save to Sheet/CSV
-                            lead_data = {
+                            lead_tasks.append({
                                 "business_name": name,
-                                "school_name": name,  # Alias for sheets mapping
-                                "first_name": person_name["first"],
-                                "last_name": person_name["last"],
-                                "role": lead_role, 
-                                "business_type": "School",
-                                "school_type": "School",
-                                "domain": website_link,
                                 "phone": phone,
-                                "email": "",
+                                "website": website_link,
                                 "city": _parsed_city,
                                 "state": _parsed_state,
-                                "notes": f"Scraped from Google Maps: {query}.",
-                                "status": "pending",
-                                "email_verified": "unchecked",
-                                "custom_data": {} # Will hold {email: verification_status}
-                            }
-
-                            # Verify all emails found (cap at top 5 to avoid infinite loops on directories)
-                            verification_results = {}
-                            primary_email = ""
-                            
-                            for email in emails[:5]:
-                                v_result = verify_email_bulk(email)
-                                status = "verified" if v_result["valid"] else f"invalid ({v_result['reason']})"
-                                verification_results[email] = status
-                                
-                                # Strict Upload Logic: Only keep perfectly valid emails
-                                if v_result["valid"]:
-                                    primary_email = email
-                                    break  # SPEED FIX: We only need ONE good email to send a campaign! Stop checking.
-                            
-                            # If no email survived verifiable checks, immediately discard the lead
-                            if not primary_email:
-                                logger.info(f"  🗑️ Discarding '{name}' - 0/{len(emails[:5])} emails were valid")
-                                continue
-                                
-                            lead_data["email"] = primary_email
-                            lead_data["custom_data"] = json.dumps(verification_results)
-                            lead_data["email_verified"] = "verified"
-                            lead_data["status"] = "pending" # Ready for sending
-                            
-                            stats_extracted += 1
-                            logger.info(f"[+] Verified Lead Extracted: {name} ({primary_email})")
-                            lead_data["notes"] += f" Emails found: {len(emails)}. Results: {verification_results}"
-                            
-                            self._save_lead(lead_data)
-                            
+                                "query": query
+                            })
                         except Exception as e:
-                            logger.error(f"Error extracting card {i}: {e}")
+                            logger.error(f"Error collecting card {i}: {e}")
+
+                    # 2. Process website extraction in PARALLEL (Medium - Browser Visits here)
+                    logger.info(f"🚀 Processing {len(lead_tasks)} websites in parallel (Limit: 5 concurrent)...")
+                    semaphore = asyncio.Semaphore(5) # Max 5 concurrent browsers to save RAM on Railway
+                    
+                    async def process_lead_website(item):
+                        async with semaphore:
+                            try:
+                                emails = []
+                                person_name = self._extract_name_from_business(item["business_name"])
+                                
+                                if item["website"]:
+                                    extraction = await self._extract_emails_and_names(context, item["website"], item["business_name"])
+                                    emails = extraction["emails"]
+                                    if not person_name["first"] and extraction["person"]["first"]:
+                                        person_name = extraction["person"]
+                                
+                                item["emails"] = emails
+                                item["person"] = person_name
+                                return item
+                            except Exception as e:
+                                logger.error(f"Error extracting from {item['website']}: {e}")
+                                item["emails"] = []
+                                item["person"] = {"first": "", "last": "", "role": ""}
+                                return item
+
+                    # Run all extraction tasks in parallel
+                    enriched_leads = await asyncio.gather(*[process_lead_website(lt) for lt in lead_tasks])
+
+                    # 3. Serial Verification Loop (Slow - API Calls here)
+                    # This happens AFTER the browsers are done, saving memory
+                    logger.info(f"🛡️ Verifying {len(enriched_leads)} leads sequentially (Respecting API rate limits)...")
+                    for lead_item in enriched_leads:
+                        emails = lead_item.get("emails", [])
+                        if not emails:
                             continue
+
+                        # Determine Role
+                        person_name = lead_item["person"]
+                        lead_role = person_name.get("role", "")
+                        if not lead_role:
+                            lead_role = "School Administrator" if person_name["first"] else "Owner/Manager"
+                        
+                        # Verify emails one by one until we get a hit
+                        primary_email = ""
+                        verification_results = {}
+                        
+                        for email in emails[:5]: # Cap at 5 for efficiency
+                            v_result = verify_email_bulk(email)
+                            status = "passed" if v_result["valid"] else f"failed ({v_result['reason']})"
+                            verification_results[email] = status
+                            
+                            if v_result["valid"]:
+                                primary_email = email
+                                break 
+                        
+                        if not primary_email:
+                            logger.info(f"  🗑️ Discarding '{lead_item['business_name']}' - No valid emails found among {len(emails)}")
+                            continue
+                            
+                        # Final Lead Structure
+                        lead_data = {
+                            "email": primary_email,
+                            "first_name": person_name["first"],
+                            "last_name": person_name["last"],
+                            "role": lead_role,
+                            "business_name": lead_item["business_name"],
+                            "school_name": lead_item["business_name"],
+                            "business_type": "School",
+                            "domain": self._clean_domain(lead_item["website"]),
+                            "state": lead_item["state"],
+                            "city": lead_item["city"],
+                            "phone": lead_item["phone"],
+                            "status": "pending",
+                            "email_verified": "passed",
+                            "notes": f"Scraped via query: {lead_item['query']}. Verified: {primary_email}. Results: {json.dumps(verification_results)}"
+                        }
+                        
+                        stats_extracted += 1
+                        logger.info(f"[+] Verified Lead Extracted: {lead_item['business_name']} ({primary_email})")
+                        self._save_lead(lead_data)
 
                 except Exception as e:
                     logger.error(f"Error processing query {query}: {e}")
