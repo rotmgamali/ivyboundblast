@@ -597,18 +597,26 @@ class GoogleMapsScraper:
                             if not lead_role:
                                 lead_role = "School Administrator" if person_name["first"] else "Owner/Manager"
                             
+                            # Parse state from query (e.g. "Private schools in Houston, TX" -> "TX")
+                            import re
+                            _state_match = re.search(r',\s*([A-Z]{2})\s*$', query)
+                            _parsed_state = _state_match.group(1) if _state_match else ""
+                            _parsed_city = query.split(" in ")[-1].rsplit(",", 1)[0].strip() if " in " in query else ""
+                            
                             # Save to Sheet/CSV
                             lead_data = {
-                                "business_name": name, 
+                                "business_name": name,
+                                "school_name": name,  # Alias for sheets mapping
                                 "first_name": person_name["first"],
                                 "last_name": person_name["last"],
                                 "role": lead_role, 
                                 "business_type": "School",
+                                "school_type": "School",
                                 "domain": website_link,
                                 "phone": phone,
                                 "email": "",
-                                "city": query.split(" in ")[-1].replace(", FL", "").rstrip(", TX").strip() if " in " in query else "",
-                                "state": "FL" if " FL" in query else ("TX" if " TX" in query else ""),
+                                "city": _parsed_city,
+                                "state": _parsed_state,
                                 "notes": f"Scraped from Google Maps: {query}.",
                                 "status": "pending",
                                 "email_verified": "unchecked",
