@@ -6,6 +6,7 @@ Integrates with sheets_integration.py to save leads.
 """
 
 import asyncio
+import json
 import re
 import sys
 import logging
@@ -598,7 +599,6 @@ class GoogleMapsScraper:
                                 lead_role = "School Administrator" if person_name["first"] else "Owner/Manager"
                             
                             # Parse state from query (e.g. "Private schools in Houston, TX" -> "TX")
-                            import re
                             _state_match = re.search(r',\s*([A-Z]{2})\s*$', query)
                             _parsed_state = _state_match.group(1) if _state_match else ""
                             _parsed_city = query.split(" in ")[-1].rsplit(",", 1)[0].strip() if " in " in query else ""
@@ -642,7 +642,6 @@ class GoogleMapsScraper:
                                 logger.debug(f"  Discarding lead '{name}' - 0 out of {len(emails[:5])} checked emails were valid.")
                                 continue
                                 
-                            import json
                             lead_data["email"] = primary_email
                             lead_data["custom_data"] = json.dumps(verification_results)
                             lead_data["email_verified"] = "verified"
