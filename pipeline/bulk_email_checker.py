@@ -7,15 +7,15 @@ logger = logging.getLogger(__name__)
 
 BULK_EMAIL_CHECKER_API_KEY = "VJIHKeGCrvXfUEpFq6wAyBDTQY8n2kW9"
 
+# ONLY block emails that are truly dead-end / no human reads.
+# School-specific prefixes (admissions, office, enrollment, etc.) are KEPT
+# because at small schools these are read by principals and directors.
 GENERIC_EMAIL_PREFIXES = {
-    "info", "admin", "office", "contact", "support", "help", "hello",
-    "sales", "marketing", "billing", "accounts", "hr", "jobs", "careers",
-    "webmaster", "postmaster", "hostmaster", "abuse", "noreply", "no-reply",
-    "communications", "media", "press", "news", "newsletter", "subscribe",
-    "frontoffice", "front.office", "reception", "registrar", "admissions",
-    "enrollment", "enroll", "attendance", "cashier", "feedback",
-    "general", "main", "team", "staff", "department", "inquiry",
-    "website", "websitecontact", "web", "siteadmin",
+    "noreply", "no-reply", "no.reply", "donotreply", "do-not-reply",
+    "webmaster", "postmaster", "hostmaster", "abuse", "mailer-daemon",
+    "siteadmin", "websitecontact", "web",
+    "newsletter", "subscribe", "unsubscribe",
+    "billing", "accounts", "jobs", "careers",
 }
 
 def _is_generic_email(email: str) -> bool:
