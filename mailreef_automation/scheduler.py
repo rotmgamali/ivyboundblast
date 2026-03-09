@@ -209,9 +209,13 @@ class EmailScheduler:
                         self._last_cache_update = now
                         self.logger.info(f"✅ Cached {len(new_batch)} fresh Stage 1 leads.")
                     else:
-                        self.logger.warning("⚠️ No pending Stage 1 leads found!")
+                        # BACKOFF: Set update time so we don't re-scan immediately
+                        # The scraper will add new leads to the sheet; we'll find them on next TTL expiry
+                        self._last_cache_update = now
+                        self.logger.warning("⚠️ No pending leads found. Waiting for scraper to add new leads (next check in 5 min)...")
                 except Exception as e:
                     # Log only the first line of the error to avoid 429 flood noise
+                    self._last_cache_update = now  # Backoff on error too
                     self.logger.error(f"❌ Lead cache refresh failed: {str(e).splitlines()[0]}")
 
     def _refresh_followup_cache_if_needed(self, sender_email, inbox_id):
