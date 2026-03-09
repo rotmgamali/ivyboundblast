@@ -81,7 +81,7 @@ CAMPAIGN_PROFILES = {
         "replies_sheet": "Ivy Bound - Reply Tracking",
         "replies_sheet_id": "1jeLkdufaMub4rylaPnoTQZwDiLpHmut5hcQQStl8UxI",
         "send_window_group": "default",
-        "inbox_indices": (0, 50), # Uses first 50 inboxes
+        "inbox_indices": (67, 117), # Uses first 50 errorskin inboxes
         "log_file": "ivybound.log",
         "template_dir": "templates",
         "campaign_type": "school",
@@ -93,7 +93,7 @@ CAMPAIGN_PROFILES = {
         "replies_sheet": "Web4Guru - Reply Tracking",
         "send_window_group": "default",
         "campaign_type": "b2b",
-        "inbox_indices": (95, 190), # Uses the 95 birdsgeese inboxes (verified 95-190)
+        "inbox_indices": (0, 67), # Uses the 67 birdsgeese inboxes
         "log_file": "web4guru.log",
         "templates_dir": "templates_strategy_b",
         "archetypes": {
@@ -110,7 +110,7 @@ CAMPAIGN_PROFILES = {
         "replies_sheet": "Web4Guru Accountants - Reply Tracking",
         "send_window_group": "default", # Same window as others
         "campaign_type": "b2b",
-        "inbox_indices": (0, 95), # Uses the 95 errorskin inboxes (verified 0-95)
+        "inbox_indices": (67, 162), # Uses the 95 errorskin inboxes (verified 67-161)
         "log_file": "web4guru_accountants.log",
         "templates_dir": "templates/web4guru/accountants", # Base dir for templates
         "reply_prompt": "prompts/web4guru_accountant_reply.txt",
