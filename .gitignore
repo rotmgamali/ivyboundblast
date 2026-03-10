@@ -33,10 +33,6 @@ data/
 # Oversized / Data directories
 Flaming Diva/
 ivybound-lead-gen/
-warming/
-leads/
-scrapers/
-senders/
 # templates/ (Removed from ignore to allow cloud deployment)
 Jobs/
 Jobs_Clone/
