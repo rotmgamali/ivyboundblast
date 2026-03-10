@@ -11,22 +11,10 @@ import os
 
 # Add project root to path BEFORE any other imports
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Add project root to path BEFORE any other imports
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 sys.path.insert(0, os.path.join(ROOT_DIR, "mailreef_automation"))
 
-# Debug: List root dir to see if automation_scrapers is there
-print(f"DEBUG: ROOT_DIR is {ROOT_DIR}")
-try:
-    print(f"DEBUG: Root contents: {os.listdir(ROOT_DIR)}")
-    scrapers_path = os.path.join(ROOT_DIR, 'automation_scrapers')
-    if os.path.exists(scrapers_path):
-        print(f"DEBUG: automation_scrapers dir exists. Contents: {os.listdir(scrapers_path)}")
-    else:
-        print(f"DEBUG: automation_scrapers dir NOT FOUND at {scrapers_path}")
-except Exception as e:
-    print(f"DEBUG: Error listing dir: {e}")
+
 
 import automation_config
 from mailreef_client import MailreefClient

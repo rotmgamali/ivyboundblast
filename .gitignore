@@ -37,3 +37,27 @@ ivybound-lead-gen/
 Jobs/
 Jobs_Clone/
 playbook.pdf
+
+# Lead Gen Artifacts (run locally on LeadMachine, not Railway)
+leads/
+scripts/
+data/
+pipeline.py
+pipeline/
+automation_scrapers/
+*.png
+*.pdf
+*.html
+recovery_output.txt
+service_account_base64.txt
+input_contacts.csv
+single_domain.txt
+failed_domains.txt
+missing_domains.txt
+headers.json
+bulk_name_cleanup.py
+production_export.py
+process_all_backlog.py
+find_inbox_indices.py
+calculate_average_sends.py
+manage_locks.py
