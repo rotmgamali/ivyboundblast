@@ -237,16 +237,19 @@ class ReplyWatcher:
                     subject = msg.get("subject_line", "")
                     
                     ts = msg.get("ts")
-                    if not ts:
-                        continue
-                        
                     # ts is unix timestamp
                     msg_dt = datetime.fromtimestamp(ts)
                     # Filter by date FIRST to prevent spamming logs with historical matches
                     if msg_dt <= since_dt:
                         continue
-                    
-                    # FILTER 1: Skip warmup emails (but known leads always pass)
+                        
+                    # FILTER 1: Skip archived emails (Mailreef Routing Rules)
+                    # If the user sets up an auto-archive rule for warming, we skip it here.
+                    if msg.get("archived") is True:
+                        logger.debug(f"⏭️ [SKIP] Email is archived by Mailreef routing: {subject}")
+                        continue
+
+                    # FILTER 2: Skip warming emails (but known leads always pass)
                     if self.is_warmup(from_email, subject):
                         continue
 
