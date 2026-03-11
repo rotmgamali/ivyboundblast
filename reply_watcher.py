@@ -154,11 +154,12 @@ class ReplyWatcher:
         with open(self.state_file, 'w') as f:
             json.dump(state, f)
 
-    def is_warmup(self, from_email: str, subject: str) -> bool:
+    def is_warmup(self, from_email: str, subject: str, msg: dict = None) -> bool:
         """
         Differentiate between Ivy Bound system emails and Mailreef warmup service.
         1. Lead-First: If the sender is in our lead list, it is NEVER warmup.
         2. Subject check: Normal filtering logic.
+        3. Body check: Specific warming tags.
         """
         if not from_email:
             return True
@@ -176,14 +177,9 @@ class ReplyWatcher:
                 logger.info(f"📬 [REPLY] Domain match found for lead: {email_clean} (@{domain})")
                 return False
 
-        if not subject:
-            # If no subject, but we have a body, it might be a reply from a phone or app.
-            # Don't filter out if from a known lead or lead domain (already handled above).
-            return False
+        subj_lower = subject.lower() if subject else ""
         
-        subj_lower = subject.lower()
-        
-        # 1. High-Confidence Warmup patterns only (Technical bot noise)
+        # 1. Subject Warmup patterns
         warmup_patterns = [
             "bug fixes", "software training", "expense reports",
             "sales report", "performance reviews",
@@ -199,13 +195,27 @@ class ReplyWatcher:
             "challenge discussion", "publication discussion", "contact person",
             "new hire", "it support", "leave request", "w-8", "tax forms",
             "security update", "account action", "mandatory account", 
-            "office recycling", "employee satisfaction", "project timeline"
+            "office recycling", "employee satisfaction", "project timeline",
+            "inventory check", "travel plans", "milestone achievement"
         ]
         
         for pattern in warmup_patterns:
             if pattern in subj_lower:
-                logger.info(f"🗑️ [FILTER] Filtered as warmup (Pattern: {pattern}): {from_email}")
+                logger.info(f"🗑️ [FILTER] Filtered as warmup (Subject: {pattern}): {from_email}")
                 return True
+
+        # 2. Body/Snippet Warmup tags (Unique hyphenated words)
+        if msg:
+            content = f"{msg.get('snippet_preview', '')} {msg.get('body_text', '')}".lower()
+            body_tags = [
+                "other-", "stock-globe", "blank-order", "point-where", 
+                "noise-chest", "occur-light", "basic-route", "queen-again",
+                "wrong-broke", "other-them", "other-feedback", "event-pupil"
+            ]
+            for tag in body_tags:
+                if tag in content:
+                    logger.info(f"🗑️ [FILTER] Filtered as warmup (Body Tag: {tag}): {from_email}")
+                    return True
                 
         # 3. DEFAULT TO FALSE: If we aren't sure, let it through.
         return False
@@ -250,7 +260,7 @@ class ReplyWatcher:
                         continue
 
                     # FILTER 2: Skip warming emails (but known leads always pass)
-                    if self.is_warmup(from_email, subject):
+                    if self.is_warmup(from_email, subject, msg):
                         continue
 
                     # ========== LEAD-FIRST PRIORITY ==========
