@@ -495,6 +495,16 @@ Return ONLY one word: positive, negative, or neutral."""
             except Exception as e:
                 logger.error(f"❌ Failed to log to sheets: {e}")
                 
+            # 3b. Forward to recipients
+            msg_id = reply.get("id")
+            recipients = getattr(automation_config, "FORWARD_NOTIFICATIONS_TO", [])
+            if msg_id and recipients:
+                for recipient in recipients:
+                    try:
+                        self.mailreef.forward_email(msg_id, recipient)
+                    except Exception as fe:
+                        logger.error(f"❌ Failed to forward {msg_id} to {recipient}: {fe}")
+                
             
             # 4. Telegram Alert for Positive Sentiment
             if sentiment == 'positive':
