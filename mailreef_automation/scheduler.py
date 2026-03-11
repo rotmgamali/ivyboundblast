@@ -355,11 +355,6 @@ class EmailScheduler:
                 body_text = result['body']
                 body_html = body_text.replace('\n', '<br>')
                 
-                # --- OPT-OUT COMPLIANCE ---
-                opt_out_url = self.profile_config.get("opt_out_url")
-                if opt_out_url:
-                    body_text += f"\n\nOpt Out: {opt_out_url}"
-                    body_html += f'<br><br><small><a href="{opt_out_url}" style="color: #999; text-decoration: none;">Opt Out</a></small>'
                 
                 # VERBOSE LOGGING FOR USER VISIBILITY (Consolidated to prevent interleaving)
                 log_msg = [
