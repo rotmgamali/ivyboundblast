@@ -106,25 +106,12 @@ def main():
         logger.info("Validating inbox configuration...")
         try:
             inboxes = mailreef.get_inboxes()
-            
             if len(inboxes) < cfg.TOTAL_INBOXES:
                 logger.warning(f"Expected {cfg.TOTAL_INBOXES} inboxes, found {len(inboxes)}")
-            
-            # Check inbox health
-            logger.info("Checking inbox health...")
-            for inbox in inboxes:
-                try:
-                    # Optimized to avoid 95 API calls on startup if not strictly necessary,
-                    # but following the prompt's structure:
-                    status = mailreef.get_inbox_status(inbox["id"])
-                    if status.get("deliverability_score", 100) < 80:
-                        logger.warning(f"Inbox {inbox['id']} has low deliverability: {status}")
-                except Exception as e:
-                    logger.warning(f"Could not check status for inbox {inbox['id']}: {e}")
-                    
+            else:
+                logger.info(f"✅ Configuration verified: {len(inboxes)} inboxes active.")
         except Exception as e:
             logger.error(f"Failed to fetch inboxes: {e}")
-            # Depending on severity, might exit or continue
         
         # Start the scheduler
         logger.info("Starting email scheduler...")

@@ -212,7 +212,7 @@ class ReplyWatcher:
         
         for pattern in warmup_patterns:
             if pattern in subj_lower:
-                logger.info(f"🗑️ [FILTER] Filtered as warmup (Subject: {pattern}): {from_email}")
+                logger.debug(f"🗑️ [FILTER] Filtered as warmup (Subject: {pattern}): {from_email}")
                 return True
 
         # 2. Body/Snippet Warmup tags (Unique hyphenated words)
@@ -225,7 +225,7 @@ class ReplyWatcher:
             ]
             for tag in body_tags:
                 if tag in content:
-                    logger.info(f"🗑️ [FILTER] Filtered as warmup (Body Tag: {tag}): {from_email}")
+                    logger.debug(f"🗑️ [FILTER] Filtered as warmup (Body Tag: {tag}): {from_email}")
                     return True
                 
         # 3. DEFAULT TO FALSE: If we aren't sure, let it through.

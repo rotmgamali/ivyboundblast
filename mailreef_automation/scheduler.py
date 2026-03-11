@@ -132,19 +132,18 @@ class EmailScheduler:
                     if i not in paused_indices:
                         active_inboxes.append(inbox)
                 
-                print(f"Business day rotation: Pausing inboxes at indices {paused_indices}")
+                self.logger.debug(f"Business day rotation: Pausing inboxes at indices {paused_indices}")
             else:
                 # Weekend or high-volume profile: All inboxes active
-                active_inboxes = all_inboxes
                 if is_high_volume:
-                    print(f"High-Volume Profile ({self.profile_config.get('log_file')}): All {len(active_inboxes)} inboxes active (Rotation disabled)")
+                    self.logger.info(f"High-Volume Profile ({self.profile_config.get('log_file')}): All {len(active_inboxes)} inboxes active (Rotation disabled)")
                 else:
-                    print("Business day: All inboxes active (Rotation skip)")
+                    self.logger.debug("Business day: All inboxes active (Rotation skip)")
         
         else:
             # Weekend
             active_inboxes = all_inboxes
-            print("Weekend: All inboxes active")
+            self.logger.info("Weekend: All inboxes active")
         
         emails_assigned_per_inbox = {}
         for inbox in active_inboxes:
@@ -225,7 +224,7 @@ class EmailScheduler:
                 else:
                     self._lead_cache = []
                     self._cache_dry = True
-                    self.logger.info("⏳ No pending leads. Scraper is working — next check in 5 min.")
+                    self.logger.debug("⏳ No pending leads in sheet.")
             except Exception as e:
                 self._last_cache_update = now  # Backoff on error too
                 self.logger.error(f"❌ Lead cache refresh failed: {str(e).splitlines()[0]}")
