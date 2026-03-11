@@ -77,7 +77,8 @@ class ReplyWatcher:
         self.sheets_client = GoogleSheetsClient(
             input_sheet_name=profile_config["input_sheet"],
             replies_sheet_name=profile_config["replies_sheet"],
-            replies_sheet_id=profile_config.get("replies_sheet_id")
+            replies_sheet_id=profile_config.get("replies_sheet_id"),
+            replies_worksheet_name=getattr(self.config, "ACTIVE_REPLIES_WORKSHEET", None)
         )
         self.sheets_client.setup_sheets() # Ensure sheet1 is available
         self.telegram = TelegramNotifier()
@@ -179,6 +180,16 @@ class ReplyWatcher:
 
         subj_lower = subject.lower() if subject else ""
         
+        # 0. SUBJECT-MATCH PRIORITY (The "Inverse" filter)
+        # If the subject contains one of OUR phrases, it's almost certainly a real reply.
+        # We bypass all bot filtering in this case.
+        profile_config = self.config.CAMPAIGN_PROFILES.get(self.profile_name, {})
+        known_patterns = profile_config.get("subject_patterns", [])
+        for p in known_patterns:
+            if p.lower() in subj_lower:
+                logger.info(f"🎯 [MATCH] Confirmed real reply via subject match: '{p}'")
+                return False
+
         # 1. Subject Warmup patterns
         warmup_patterns = [
             "bug fixes", "software training", "expense reports",

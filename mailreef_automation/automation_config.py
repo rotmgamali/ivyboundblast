@@ -58,6 +58,7 @@ if not MAILREEF_API_KEY:
 
 # ==================== CAMPAIGN SETTINGS ====================
 SUPPRESSION_SHEET_NAME = "Master Suppression List"
+ACTIVE_REPLIES_WORKSHEET = "March" # Monthly tracking
 
 CAMPAIGN_CONFIG = {
     "sequence_length": 1,  # 1-email sequence (no follow-ups)
@@ -86,7 +87,7 @@ CAMPAIGN_PROFILES = {
         "template_dir": "templates",
         "campaign_type": "school",
         "opt_out_url": "https://ivybound.net/opt-out",
-        "subject_patterns": ["Quick question about"],
+        "subject_patterns": ["Quick question about", "Quick question for"],
         "server_filter": "errorskin"
     },
     "STRATEGY_B": {
@@ -104,7 +105,7 @@ CAMPAIGN_PROFILES = {
             "operations": ["operations", "coo", "manager", "principal"]
         },
         "opt_out_url": "https://web4guru.com/opt-out",
-        "subject_patterns": ["Question for", "AI tools"],
+        "subject_patterns": ["Question for", "AI tools", "growth strategies"],
         "server_filter": "birdsgeese"
     },
     "WEB4GURU_ACCOUNTANTS": {
@@ -119,7 +120,7 @@ CAMPAIGN_PROFILES = {
         "reply_prompt": "prompts/web4guru_accountant_reply.txt",
         "auto_reply_template": "b2b/general/email_2.txt",
         "opt_out_url": "https://web4guru.com/opt-out",
-        "subject_patterns": ["Inquiry", "Question", "Growth /"],
+        "subject_patterns": ["Inquiry", "Question", "Growth /", "Accounting growth"],
         "server_filter": "errorskin"
     }
 }

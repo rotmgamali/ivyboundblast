@@ -53,10 +53,11 @@ REPLIES_SHEET_NAME = "Ivy Bound - Reply Tracking"
 class GoogleSheetsClient:
     """Handles all Google Sheets operations for the campaign."""
     
-    def __init__(self, input_sheet_name=INPUT_SHEET_NAME, replies_sheet_name=REPLIES_SHEET_NAME, replies_sheet_id=None):
+    def __init__(self, input_sheet_name=INPUT_SHEET_NAME, replies_sheet_name=REPLIES_SHEET_NAME, replies_sheet_id=None, replies_worksheet_name=None):
         self.input_sheet_name = input_sheet_name
         self.replies_sheet_name = replies_sheet_name or REPLIES_SHEET_NAME
         self.replies_sheet_id = replies_sheet_id
+        self.replies_worksheet_name = replies_worksheet_name
         self.logger = logger
         
         self.client: Optional[gspread.Client] = None
@@ -590,7 +591,15 @@ class GoogleSheetsClient:
     @retry_on_quota
     def log_reply(self, reply_data: Dict[str, Any]):
         """Log a reply to the replies sheet, auto-enriching with lead data if possible."""
-        worksheet = self.replies_sheet.sheet1
+        if self.replies_worksheet_name:
+            try:
+                worksheet = self.replies_sheet.worksheet(self.replies_worksheet_name)
+            except gspread.WorksheetNotFound:
+                # Fallback to sheet1 if named worksheet not found
+                logger.warning(f"⚠️ Worksheet '{self.replies_worksheet_name}' not found. Falling back to first sheet.")
+                worksheet = self.replies_sheet.sheet1
+        else:
+            worksheet = self.replies_sheet.sheet1
         
         from_email = str(reply_data.get('from_email', '')).lower().strip()
         
