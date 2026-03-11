@@ -26,5 +26,5 @@ COPY . .
 # Create logs directory
 RUN mkdir -p mailreef_automation/logs
 
-# Launch Ivybound: Lead Generator + Email Sender
+# Launch Ivybound: Email Sender
 CMD ["bash", "start_ivybound.sh"]
