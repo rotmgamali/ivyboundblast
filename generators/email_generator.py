@@ -401,10 +401,12 @@ STYLE GUIDE:
   2. DO NOT include a sign-off (e.g. "Best, Mark").
   3. OUTPUT ONLY the Subject and the Body paragraphs.
 
-CONTEXT:
-This is a {school_type} school.
 - IF PUBLIC: Focus on district alignment, budget efficiency, and improving standardized test scores.
 - IF PRIVATE: Focus on enrollment, prestige, and college matriculation.
+
+PLACEHOLDER POLICY:
+- NEVER use brackets or parentheses for unknown data (e.g., NO [City], NO (Name)).
+- If a piece of information is missing or you are unsure, simply omit it or use a natural, generic phrase.
 """
 
         # --- 6. User Prompt (Body Generation) ---
@@ -428,6 +430,7 @@ Rewrite the DRAFT CONTENT to make it feel personal and handwritten.
 - write ONLY the body paragraphs. 
 - NO GREETINGS (Hi..., Good morning...).
 - NO SIGN-OFFS (Best..., Andrew...).
+- NO PLACEHOLDERS: Do not use [City], (city), [Name], etc. If you don't know the city, talk about "your local community".
 - Keep it under 100 words.
 
 Output format:
@@ -462,7 +465,20 @@ BODY: [Paragraph 1]
                     if any(new_last == m or new_last.startswith(f"{m},") for m in markers):
                         lines.pop()
 
-        return "\n".join(lines).strip()
+        body = "\n".join(lines).strip()
+        
+        # 3. Strip Bracketed/Parenthetical Hallucinations (e.g. [City], (Name))
+        # This regex catches: [Text], (text), (Text), [City], etc.
+        # It replaces them with a generic community/organization reference if possible, 
+        # or just removes them.
+        body = re.sub(r'\[[^\]]+\]', 'your community', body)
+        body = re.sub(r'\([^\)]+\)', 'your community', body)
+        
+        # Cleanup double spaces or weird punctuation left behind
+        body = body.replace('your community your community', 'your community')
+        body = body.replace('  ', ' ').strip()
+        
+        return body
 
     def _generate_legacy_email(self, campaign_type: str, sequence_number: int, lead_data: dict, enrichment_data: dict) -> dict:
         """Fallback for non-school campaigns."""
