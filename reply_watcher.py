@@ -81,7 +81,10 @@ class ReplyWatcher:
             replies_worksheet_name=getattr(self.config, "ACTIVE_REPLIES_WORKSHEET", None)
         )
         self.sheets_client.setup_sheets() # Ensure sheet1 is available
-        self.telegram = TelegramNotifier()
+        self.telegram = TelegramNotifier(
+            token=getattr(self.config, "TELEGRAM_BOT_TOKEN", None),
+            chat_id=getattr(self.config, "TELEGRAM_CHAT_ID", None)
+        )
         self.generator = EmailGenerator() # Used for sentiment analysis
         
         # --- CAMPAIGN INBOX ISOLATION ---
