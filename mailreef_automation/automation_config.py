@@ -58,10 +58,7 @@ if not MAILREEF_API_KEY:
 
 # ==================== CAMPAIGN SETTINGS ====================
 SUPPRESSION_SHEET_NAME = "Master Suppression List"
-ACTIVE_REPLIES_WORKSHEET = "March" # Monthly tracking
-
-# Forwarding recipients for real replies
-FORWARD_NOTIFICATIONS_TO = ["andrew@web4guru.com"]
+ACTIVE_REPLIES_WORKSHEET = "Sheet 1" # Monthly tracking
 
 CAMPAIGN_CONFIG = {
     "sequence_length": 1,  # 1-email sequence (no follow-ups)
