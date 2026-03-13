@@ -446,6 +446,28 @@ class GoogleSheetsClient:
             logger.error(f"Failed to batch add leads: {e}")
             return False
     
+    @retry_on_quota
+    def clear_input_sheet(self) -> bool:
+        """Clear all data from the input sheet except the header."""
+        if not self.input_sheet:
+            self.setup_sheets()
+            
+        worksheet = self.input_sheet.sheet1
+        try:
+            # Get header
+            header = worksheet.row_values(1)
+            # Clear all
+            worksheet.clear()
+            # Restore header
+            if header:
+                worksheet.append_row(header)
+            logger.info("🧹 Cleared input sheet data, preserved header.")
+            self._all_records_cache = None # Bust cache
+            return True
+        except Exception as e:
+            logger.error(f"Failed to clear input sheet: {e}")
+            return False
+
     def get_pending_leads(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Get leads that haven't been contacted yet."""
         all_records = self._fetch_all_records()

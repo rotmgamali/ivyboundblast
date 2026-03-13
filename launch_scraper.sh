@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Configuration
-PROJECT_DIR="/Users/mac/Ivybound"
-PYTHON_BIN="/usr/bin/python3"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_BIN="python3"
 SCRAPER_SCRIPT="Jobs/mass_harvest.py"
 LOG_FILE="$PROJECT_DIR/scraper_service.log"
 

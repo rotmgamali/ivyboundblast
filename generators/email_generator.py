@@ -410,28 +410,32 @@ PLACEHOLDER POLICY:
 """
 
         # --- 6. User Prompt (Body Generation) ---
-        user_prompt = f"""Here is the CORE CONTENT of an email I want to send to {first_name} ({lead_data.get('role')}) at {school_name}.
+        user_prompt = f"""Here is the CORE CONTENT of an email I want to send to {first_name} ({lead_data.get('role', 'Executive')}) at what is currently identified as "{school_name}" in my records.
+        
+CRITICAL SOURCE OF TRUTH:
+The identification "{school_name}" may be inaccurate. You MUST read the RESEARCH HIGHLIGHTS (Web Scrape) below and determine the actual, correct school name. Use the name you find in the website text for all references in the email.
 
 DRAFT CONTENT:
 '''
 {clean_draft}
 '''
 
-LEAD CONTEXT (Use this to personalize!):
+LEAD CONTEXT (Use this where appropriate):
 {custom_context}
 
-RESEARCH HIGHLIGHTS (Web Scrape):
+RESEARCH HIGHLIGHTS (Live Web Scrape - THE SOURCE OF TRUTH):
 {website_content[:3000]}
 
 TASK:
-Rewrite the DRAFT CONTENT to make it feel personal and handwritten.
-- Use the LEAD CONTEXT (Founded year, specific description, city, etc.) to show you've done your homework.
-- REPUTATION GUIDELINE: If mentioned, be positive or supportive. Never be critical of their reviews; instead, mention how much you appreciate their commitment to the community.
-- write ONLY the body paragraphs. 
-- NO GREETINGS (Hi..., Good morning...).
-- NO SIGN-OFFS (Best..., Andrew...).
-- NO PLACEHOLDERS: Do not use [City], (city), [Name], etc. If you don't know the city, talk about "your local community".
-- Keep it under 100 words.
+1. Identify the CORRECT SCHOOL NAME from the RESEARCH HIGHLIGHTS.
+2. Rewrite the DRAFT CONTENT to make it feel personal and handwritten.
+3. Use the LEAD CONTEXT and RESEARCH HIGHLIGHTS (programs, mission, location) to show you've done your homework.
+4. write ONLY the body paragraphs. 
+5. NO GREETINGS (Hi..., Good morning...).
+6. NO SIGN-OFFS (Best..., Andrew...).
+7. NO PLACEHOLDERS: Do not use [City], (city), [Name], etc. 
+
+Keep the response under 100 words.
 
 Output format:
 SUBJECT: [Personalized Subject]
