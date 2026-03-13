@@ -365,6 +365,19 @@ class EmailScheduler:
                 
                 subject = result['subject']
                 body_text = result['body']
+
+                # --- DOMAIN GUARD SKIP LOGIC ---
+                if subject == "SKIP_LEAD":
+                    self.logger.warning(f"🛡️ [SKIP] Lead {prospect.get('email')} failed Domain Guard: {body_text}")
+                    # Update sheet to 'invalid' so it's not retried
+                    self.sheets.update_lead_status(
+                        email=prospect["email"], 
+                        status="invalid_association",
+                        sent_at=datetime.now(),
+                        sender_email=sender_email
+                    )
+                    continue
+
                 body_html = body_text.replace('\n', '<br>')
                 
                 # 2. Iterate over every gathered email

@@ -12,6 +12,7 @@ import pytz
 # Suppress SSL warnings from scraper to keep logs clean
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import re
+import json
 from mailreef_automation.logger_util import get_logger
 
 # Add project root to path to allow imports from sibling directories
@@ -100,14 +101,19 @@ class EmailGenerator:
         """
         1. Identify Archetype (Role).
         2. Load Template (file).
-        3. Scrape Website (if not already cached).
-        4. Generate Email via LLM.
+        3. Domain Guard: Verify email matches website.
+        4. Scrape Website (if not already cached).
+        5. Generate Email via LLM.
         """
+        email = lead_data.get("email", "")
+        url = lead_data.get("website") or lead_data.get("domain")
+        
+        # --- 1. Identify Archetype ---
         role = (lead_data.get("role") or "").lower()
         archetype = self._get_archetype(role)
         _logger.debug(f"🎯 [GEN] {campaign_type.upper()} Archetype: {archetype} (detected from role: '{role}')")
         
-        # Load Template
+        # --- 2. Load Template ---
         template_content = self._load_template_file(campaign_type, archetype, sequence_number)
         
         # Fallback to general if not found and archetype isn't already general
@@ -119,10 +125,9 @@ class EmailGenerator:
             _logger.error(f"❌ Template missing for {campaign_type}/{archetype}/{sequence_number} and fallback general failed.")
             return {"subject": "Quick question", "body": "I'd love to connect regarding your current operations."}
 
-        # Website Scraping
+        # --- 3. Scrape Website ---
         website_content = enrichment_data.get("website_content", "")
-        url = lead_data.get("website") or lead_data.get("domain")
-
+        
         if not website_content and url:
             # SANITY CHECK: Ensure we aren't scraping Google Maps
             if "google.com" in url.lower() or "goo.gl" in url.lower():
@@ -149,6 +154,17 @@ class EmailGenerator:
                 except Exception as e:
                     self.logger.error(f"❌ [SCRAPE ERROR] Failed for {url}: {e}")
                     website_content = "No website content available."
+
+        # --- 4. Domain Guard & Verification ---
+        if email and url:
+            is_valid, reason = self._validate_domain_association(email, url, website_content, lead_data)
+            if not is_valid:
+                self.logger.warning(f"🚫 [DOMAIN GUARD] Skipping {email}: {reason}")
+                return {
+                    "subject": "SKIP_LEAD",
+                    "body": f"Validation Failed: {reason}"
+                }
+            self.logger.info(f"🛡️ [DOMAIN GUARD] Verified: {reason}")
         
         # Parse Custom Data
         custom_json = lead_data.get("custom_data", "{}")
@@ -200,6 +216,74 @@ class EmailGenerator:
             if any(k in role for k in keywords):
                 return key
         return "general"  # Default
+
+    def _validate_domain_association(self, email: str, url: str, website_text: str, lead_data: dict) -> tuple:
+        """
+        Verify that the email domain matches the website domain.
+        If it's a generic domain (gmail/outlook) or mismatch, use AI to verify context.
+        """
+        email_domain = email.split("@")[-1].lower() if "@" in email else ""
+        
+        # Extract base domain from URL
+        clean_url = url.lower().replace("http://", "").replace("https://", "").replace("www.", "").split("/")[0]
+        url_domain = clean_url
+        
+        # 1. Direct Match Check
+        if email_domain == url_domain or url_domain.endswith(f".{email_domain}") or email_domain.endswith(f".{url_domain}"):
+            return True, f"Domain Match: {email_domain} == {url_domain}"
+
+        # 2. Generic Provider Exception
+        generics = ["gmail.com", "outlook.com", "hotmail.com", "yahoo.com", "icloud.com", "me.com"]
+        
+        # 3. AI Context Verification
+        self.logger.info(f"❓ [DOMAIN GUARD] Non-matching domain ({email_domain} vs {url_domain}). Verifying via AI...")
+        
+        first_name = lead_data.get("first_name", "")
+        last_name = lead_data.get("last_name", "")
+        role = lead_data.get("role", "staff")
+        
+        verify_prompt = f"""You are a Lead Verification Agent.
+Your job is to determine if a person's email is likely associated with a specific school website.
+
+PERSON: {first_name} {last_name}
+ROLE: {role}
+EMAIL: {email}
+WEBSITE: {url}
+
+WEBSITE TEXT (Snippet):
+'''
+{website_text[:4000]}
+'''
+
+TASK:
+Can you find evidence that this person ({first_name} {last_name}) or their role ({role}) exists at this school?
+Or does the email domain ({email_domain}) appear anywhere in the text as an official contact?
+
+Respond in JSON only:
+{{
+  "verified": true/false,
+  "confidence": 0-1,
+  "reason": "short explanation"
+}}
+"""
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": verify_prompt}],
+                response_format={ "type": "json_object" },
+                temperature=0
+            )
+            result = json.loads(response.choices[0].message.content)
+            
+            if result.get("verified") and result.get("confidence", 0) > 0.7:
+                return True, f"AI Verified: {result.get('reason')}"
+            else:
+                return False, f"AI Rejected: {result.get('reason')}"
+        except Exception as e:
+            self.logger.error(f"Error during AI Domain Verification: {e}")
+            # Fallback: if it's a generic email but we have a strong name match? 
+            # For safety, we reject if AI fails/unsure.
+            return False, f"Verification Error: {str(e)}"
 
     def _sanitize_name(self, name: str, lead_data: dict) -> str:
         """Sanitize first name to avoid 'Hi Harvest' or 'Hi Info'."""
