@@ -357,12 +357,20 @@ class EmailScheduler:
                     if custom_data_str:
                         extra_data = json.loads(custom_data_str)
                         if isinstance(extra_data, dict):
-                            for extra_email in extra_data.keys():
+                            for extra_email, extra_title in extra_data.items():
                                 extra_email_clean = str(extra_email).strip()
                                 if is_valid_email(extra_email_clean) and extra_email_clean not in target_emails:
                                     target_emails.append(extra_email_clean)
                 except Exception as e:
                     self.logger.debug(f"Could not parse custom_data emails for {prospect.get('email')}: {e}")
+
+                # --- DECISION MAKER CAP: Max 3, most senior first ---
+                # The primary email (already validated) stays first.
+                # Additional emails from custom_data are appended and the whole
+                # list is then capped to 3 to avoid blasting an entire school.
+                if len(target_emails) > 3:
+                    self.logger.info(f"📋 [DM CAP] Trimming {len(target_emails)} emails → top 3 for {prospect.get('email')}")
+                    target_emails = target_emails[:3]
 
                 if not target_emails:
                     self.logger.warning(f"🚫 [SKIP] No valid email addresses found for prospect {prospect.get('email', 'unknown')}. Skipping send.")

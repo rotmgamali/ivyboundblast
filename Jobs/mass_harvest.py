@@ -49,6 +49,73 @@ MAX_LEADS_PER_BATCH = 60 # Fetches up to 60 results per search term (covers most
 
 # ---------------------
 
+import json
+import re
+
+# ---- Decision-Maker Targeting ----
+# Title keywords ranked by seniority (highest first)
+DECISION_MAKER_TITLES = [
+    # Tier 1: Ultimate authority
+    ["superintendent", "executive director", "ceo", "president", "founder", "owner"],
+    # Tier 2: Principal leadership
+    ["principal", "head of school", "headmaster", "headmistress"],
+    # Tier 3: Directors
+    ["director of admissions", "director of education", "director of curriculum", "director"],
+    # Tier 4: Academic leaders
+    ["academic dean", "dean of students", "dean"],
+    # Tier 5: Counselors / Advisors
+    ["college counselor", "guidance counselor", "college advisor", "counselor", "advisor"],
+    # Tier 6: Admissions / Enrollment (relevant to our pitch)
+    ["admissions", "enrollment"],
+]
+
+# Email prefixes that are NOT decision makers (skip entirely)
+GENERIC_EMAIL_PREFIXES = {
+    "info", "admin", "office", "contact", "hello", "help", "support",
+    "reception", "secretary", "webmaster", "noreply", "no-reply",
+    "mail", "general", "inquiries", "inquiry", "registrar", "accounts"
+}
+
+def score_contact(email: str, title: str) -> int:
+    """Return a priority score for a contact. Higher = more senior. -1 = disqualify."""
+    if not email or "@" not in email:
+        return -1
+    # Strip URL-style values
+    if email.startswith("http"):
+        return -1
+    # Check prefix against generic blocklist
+    prefix = email.split("@")[0].lower().strip()
+    if prefix in GENERIC_EMAIL_PREFIXES:
+        return -1
+    # Score by title
+    title_lower = (title or "").lower()
+    for tier, keywords in enumerate(DECISION_MAKER_TITLES):
+        if any(kw in title_lower for kw in keywords):
+            return len(DECISION_MAKER_TITLES) - tier  # Higher tier = higher score
+    # Unknown title — assign lowest passing score (still better than generic)
+    return 0
+
+def select_top_decision_makers(contacts: list, max_contacts: int = 3) -> list:
+    """
+    Given a list of dicts with 'email' and 'title', return the top N decision makers.
+    contacts: [{"email": "...", "title": "..."}, ...]
+    """
+    scored = []
+    seen_emails = set()
+    for c in contacts:
+        email = (c.get("email") or "").strip().lower()
+        title = c.get("title", "")
+        if not email or email in seen_emails:
+            continue
+        score = score_contact(email, title)
+        if score >= 0:  # -1 means disqualified
+            scored.append((score, email, title, c))
+            seen_emails.add(email)
+    # Sort descending by score
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [item[3] for item in scored[:max_contacts]]
+# ----------------------------------
+
 def load_processed_leads(csv_path):
     """
     Returns a set of processed titles to prevent duplicates.
@@ -88,21 +155,44 @@ def harvest_state(state_code, cities, storage, processed_leads, sheets=None):
                 # 2. Enrich
                 lead = enrich_lead(lead, "school")
                 
-                # 3. Generate (Improved Name Extraction)
-                school_name, email, sms = generate_pitch(lead)
+                # 3. Decision-Maker Targeting: Extract, score, and limit to top 3
+                # Apify returns emails in lead['emails'] (list of dicts) or lead['email'] (single str)
+                raw_contacts = []
+                if lead.get("emails") and isinstance(lead["emails"], list):
+                    for e in lead["emails"]:
+                        raw_contacts.append({
+                            "email": e.get("value", "") if isinstance(e, dict) else str(e),
+                            "title": e.get("description", "") if isinstance(e, dict) else ""
+                        })
+                elif lead.get("email"):
+                    raw_contacts.append({"email": lead["email"], "title": lead.get("role", "")})
+
+                top_contacts = select_top_decision_makers(raw_contacts, max_contacts=3)
+
+                if not top_contacts:
+                    print(f"   ⚠️  No valid decision-maker emails found for {title}. Skipping.")
+                    processed_leads.add(title.lower())
+                    continue
+
+                primary_contact = top_contacts[0]
+                primary_email = primary_contact["email"]
+                additional_emails = {c["email"]: c.get("title", "") for c in top_contacts[1:]}
+
+                school_name, email_pitch, sms = generate_pitch(lead)
                 lead['school_name'] = school_name
-                lead['generated_pitch'] = email
+                lead['generated_pitch'] = email_pitch
                 lead['sms_script'] = sms
-                
+
                 # 4. Save Locally
                 storage.log_lead(lead)
                 processed_leads.add(title.lower())
-                
-                # 5. Sync to Google Sheets
+
+                # 5. Sync to Google Sheets (primary + up to 2 extras in custom_data)
                 if sheets:
+                    extra_contacts_json = json.dumps(additional_emails) if additional_emails else "{}"
                     sheet_lead = {
-                        "email": lead.get("email") or lead.get("company_email", ""),
-                        "school_name": school_name, # Use AI extracted name
+                        "email": primary_email,
+                        "school_name": school_name,
                         "school_type": lead.get("category", ""),
                         "city": lead.get("city") or city,
                         "state": lead.get("state") or state_code,
@@ -111,16 +201,17 @@ def harvest_state(state_code, cities, storage, processed_leads, sheets=None):
                         "email_verified": "verified",
                         "custom_data": json.dumps({
                             "original_title": title,
-                            "generated_pitch": email,
+                            "generated_pitch": email_pitch,
                             "sms_script": sms,
                             "website": lead.get("website", ""),
                             "address": lead.get("address", ""),
-                            "recent_initiatives": lead.get("recent_initiatives", "")
+                            "recent_initiatives": lead.get("recent_initiatives", ""),
+                            **additional_emails  # Spread extra decision-maker emails into custom_data
                         })
                     }
-                    
                     sheets.add_leads_batch([sheet_lead])
-                    print(f"   📊 Synced to Google Sheets: {school_name} (from {title})")
+                    contact_summary = f"{primary_email}" + (f" + {len(additional_emails)} more" if additional_emails else "")
+                    print(f"   📊 Synced to Sheets: {school_name} → {contact_summary}")
                 
                 new_leads_count += 1
                 
