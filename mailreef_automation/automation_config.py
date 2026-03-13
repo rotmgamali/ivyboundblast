@@ -23,8 +23,8 @@ EMAILS_PER_INBOX_DAY_BUSINESS = 50 # Scaled from 25
 EMAILS_PER_INBOX_DAY_WEEKEND = 50  # Scaled from 9
 
 # ==================== TELEGRAM ALERTS ====================
-TELEGRAM_BOT_TOKEN = "7224632370:AAFgWL94FbffWBO6COKnYyhrMKymFJQV0po"
-TELEGRAM_CHAT_ID = "7059103286" # Auto-discovered (Andrew Rollins)
+TELEGRAM_BOT_TOKEN = ""
+TELEGRAM_CHAT_ID = ""
 
 # ==================== SENDING WINDOWS (24-hour format, EST) ====================
 # Business days: 6:00 - 19:30 (avoid 11:00-14:00 busy hours)

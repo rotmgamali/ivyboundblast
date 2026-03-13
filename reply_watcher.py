@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.join(BASE_DIR, "mailreef_automation"))
 sys.path.insert(0, BASE_DIR)
 
 from mailreef_automation.mailreef_client import MailreefClient
-from mailreef_automation.telegram_alert import TelegramNotifier
 import mailreef_automation.automation_config as automation_config
 from sheets_integration import GoogleSheetsClient
 from generators.email_generator import EmailGenerator
@@ -81,10 +80,6 @@ class ReplyWatcher:
             replies_worksheet_name=getattr(self.config, "ACTIVE_REPLIES_WORKSHEET", None)
         )
         self.sheets_client.setup_sheets() # Ensure sheet1 is available
-        self.telegram = TelegramNotifier(
-            token=getattr(self.config, "TELEGRAM_BOT_TOKEN", None),
-            chat_id=getattr(self.config, "TELEGRAM_CHAT_ID", None)
-        )
         self.generator = EmailGenerator() # Used for sentiment analysis
         
         # --- CAMPAIGN INBOX ISOLATION ---
@@ -509,11 +504,8 @@ Return ONLY one word: positive, negative, or neutral."""
                         logger.error(f"❌ Failed to forward {msg_id} to {recipient}: {fe}")
                 
             
-            # 4. Telegram Alert for Positive Sentiment
+            # 4. (Removed Telegram Alert functionality)
             if sentiment == 'positive':
-                alert_text = f"🔥 *HOT LEAD REPLY*\n\n*From:* {from_email}\n*Subject:* {subject}\n\n*Message:*\n`{body}`"
-                self.telegram.send_message(alert_text)
-                logger.info(f"🚀 Telegram alert sent for {from_email}")
                 
                 # 5. AUTO-REPLY LOGIC
                 profile_config = automation_config.CAMPAIGN_PROFILES[self.profile_name]
@@ -525,6 +517,11 @@ Return ONLY one word: positive, negative, or neutral."""
                         self.send_auto_reply(from_email, reply_data['thread_id'], inbox_email, subject)
                     else:
                         logger.error(f"Cannot auto-reply: Inbox email not found in reply data")
+                        
+        # Save the updated state so we don't process these again
+        state["last_check"] = latest_successful_dt.isoformat()
+        self.save_state(state)
+        logger.info("✅ Reply check cycle completed.")
                         
     def send_auto_reply(self, to_email: str, thread_id: str, inbox_id: str, original_subject: str):
         """Sends the follow-up pitch (Email 2) as an auto-reply."""
@@ -573,7 +570,6 @@ Return ONLY one word: positive, negative, or neutral."""
             
             if res.get("success"):
                 logger.info(f"✅ Auto-reply sent successfully to {to_email}")
-                self.telegram.send_message(f"🤖 *AUTO-REPLY SENT*\nTo: {to_email}\nFrom: {inbox_id}")
             else:
                  logger.error(f"❌ Auto-reply failed: {res.get('error')}")
 

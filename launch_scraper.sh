@@ -24,7 +24,7 @@ while true; do
     # -s: prevent system sleep on AC power
     # -d: prevent display sleep (optional, but good for visibility)
     # PYTHONPATH=. to ensure imports work from root
-    PYTHONPATH=. caffeinate -is "$PYTHON_BIN" "$SCRAPER_SCRIPT" >> "$LOG_FILE" 2>&1
+    PYTHONPATH=. caffeinate -is "$PYTHON_BIN" -u "$SCRAPER_SCRIPT" >> "$LOG_FILE" 2>&1
     
     EXIT_CODE=$?
     echo "[$(date)] Scraper exited with code $EXIT_CODE. Restarting in 60 seconds..." >> "$LOG_FILE"

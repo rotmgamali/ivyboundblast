@@ -76,27 +76,7 @@ def get_logger(name: str, log_filename: str = None):
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
     
-    # Telegram Handler (Critical Alerts)
-    # Check if TELEGRAM_AVAILABLE and configured
-    try:
-        # Avoid circular import if possible, but safe here inside function or try-except top level
-        # We'll use dynamic import to be safe
-        import sys
-        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-        from telegram_alert import TelegramNotifier, TelegramLogHandler
-        
-        # Only add if not present
-        if not any(isinstance(h, TelegramLogHandler) for h in logger.handlers):
-            notifier = TelegramNotifier()
-            if notifier.token and notifier.chat_id:
-                tg_handler = TelegramLogHandler(notifier)
-                tg_handler.setLevel(logging.ERROR) # Alert on ERROR and CRITICAL
-                tg_handler.setFormatter(formatter)
-                logger.addHandler(tg_handler)
-    except Exception as e:
-        # Don't crash logging if telegram fails setup
-        pass
-        # print(f"Failed to add Telegram handler: {e}")
+    # (Removed Telegram Handler configuration)
     
     logging.getLogger('apscheduler.executors.default').setLevel(logging.ERROR)
     logging.getLogger('apscheduler.scheduler').setLevel(logging.ERROR)
