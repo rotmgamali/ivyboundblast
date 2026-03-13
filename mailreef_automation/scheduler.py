@@ -328,26 +328,55 @@ class EmailScheduler:
         results = []
         for prospect in prospects:
             try:
-                # 1. Gather all emails for this prospect
-                target_emails = [prospect.get("email")]
+                # Resolve sender email for dynamic sign-off early so we can use it for status updates
+                if "@" in str(inbox_id):
+                    sender_email = str(inbox_id)
+                else:
+                    self._refresh_inbox_map_if_needed()
+                    sender_email = self.inbox_map.get(str(inbox_id), "unknown")
+
+                # 1. Gather all valid emails for this prospect
                 import json
+                import re
+
+                def is_valid_email(email_str):
+                    if not email_str or not isinstance(email_str, str): return False
+                    email_str = email_str.strip()
+                    if email_str.startswith('http://') or email_str.startswith('https://'): return False
+                    return bool(re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email_str))
+
+                target_emails = []
+                primary_email = str(prospect.get("email", "")).strip()
+                if is_valid_email(primary_email):
+                    target_emails.append(primary_email)
+                else:
+                    self.logger.warning(f"⚠️ [VALIDATION FAILED] Primary email is invalid: {primary_email}")
+
                 try:
                     custom_data_str = prospect.get("custom_data", "{}")
                     if custom_data_str:
                         extra_data = json.loads(custom_data_str)
                         if isinstance(extra_data, dict):
                             for extra_email in extra_data.keys():
-                                if "@" in extra_email and extra_email not in target_emails:
-                                    target_emails.append(extra_email)
+                                extra_email_clean = str(extra_email).strip()
+                                if is_valid_email(extra_email_clean) and extra_email_clean not in target_emails:
+                                    target_emails.append(extra_email_clean)
                 except Exception as e:
                     self.logger.debug(f"Could not parse custom_data emails for {prospect.get('email')}: {e}")
 
-                # Resolve sender email for dynamic sign-off
-                if "@" in str(inbox_id):
-                    sender_email = str(inbox_id)
-                else:
-                    self._refresh_inbox_map_if_needed()
-                    sender_email = self.inbox_map.get(str(inbox_id), "unknown")
+                if not target_emails:
+                    self.logger.warning(f"🚫 [SKIP] No valid email addresses found for prospect {prospect.get('email', 'unknown')}. Skipping send.")
+                    # Mark invalid in sheet so it isn't retried
+                    try:
+                        self.sheets.update_lead_status(
+                            email=prospect.get("email", "unknown"), 
+                            status="invalid_email",
+                            sent_at=datetime.now(),
+                            sender_email=sender_email
+                        )
+                    except Exception as loop_e:
+                        pass
+                    continue
                 
                 self.logger.info(f"🔍 DEBUG LOOKUP: ID={inbox_id} -> Sender: {sender_email}")
                 self.logger.info(f"🎯 Target Emails for this school: {target_emails}")
