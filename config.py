@@ -24,7 +24,7 @@ class Config:
     SERPER_API_KEY = os.getenv("SERPER_API_KEY")  # Corrected from SERPAPI
     
     # Campaign Settings
-    DAILY_SEND_LIMIT = int(os.getenv("DAILY_SEND_LIMIT", 100))
+    DAILY_SEND_LIMIT = int(os.getenv("DAILY_SEND_LIMIT", 4000))
     RATE_LIMIT = float(os.getenv("RATE_LIMIT", 1.0))
     TIMEOUT = int(os.getenv("TIMEOUT", 30))
     MAX_RETRIES = int(os.getenv("MAX_RETRIES", 3))

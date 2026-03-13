@@ -19,26 +19,26 @@ INBOXES_PER_DAY_BUSINESS = 95  # Maximize: All inboxes active
 INBOXES_PER_DAY_WEEKEND = 95   # All inboxes active on weekends
 INBOX_PAUSED_IDS = []          # Dynamic pause list for health monitoring
 
-EMAILS_PER_INBOX_DAY_BUSINESS = 50 # Scaled from 25
-EMAILS_PER_INBOX_DAY_WEEKEND = 50  # Scaled from 9
+EMAILS_PER_INBOX_DAY_BUSINESS = 32 # Target: 3,000 total (95 * 32 = 3,040)
+EMAILS_PER_INBOX_DAY_WEEKEND = 32  # Maintain consistency
 
 # ==================== TELEGRAM ALERTS ====================
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
 
 # ==================== SENDING WINDOWS (24-hour format, EST) ====================
-# Business days: 6:00 - 19:30 (avoid 11:00-14:00 busy hours)
+# Business days: Spaced for human-like distribution (max 3-4 per hour per inbox)
 BUSINESS_DAY_WINDOWS = [
-    {"start": 6, "end": 7, "emails_per_inbox": 4},
-    {"start": 7, "end": 8, "emails_per_inbox": 4},
-    {"start": 8, "end": 9, "emails_per_inbox": 6},
-    {"start": 9, "end": 10, "emails_per_inbox": 8},
-    {"start": 10, "end": 11, "emails_per_inbox": 6},
-    {"start": 12, "end": 13, "emails_per_inbox": 6},
-    {"start": 15, "end": 16, "emails_per_inbox": 4},
-    {"start": 16, "end": 17, "emails_per_inbox": 4},
-    {"start": 17, "end": 18, "emails_per_inbox": 4},
-    {"start": 18, "end": 19, "emails_per_inbox": 4},
+    {"start": 6, "end": 7, "emails_per_inbox": 3},
+    {"start": 7, "end": 8, "emails_per_inbox": 3},
+    {"start": 8, "end": 9, "emails_per_inbox": 4},
+    {"start": 9, "end": 10, "emails_per_inbox": 4},
+    {"start": 10, "end": 11, "emails_per_inbox": 4},
+    {"start": 12, "end": 13, "emails_per_inbox": 3},
+    {"start": 15, "end": 16, "emails_per_inbox": 3},
+    {"start": 16, "end": 17, "emails_per_inbox": 3},
+    {"start": 17, "end": 18, "emails_per_inbox": 3},
+    {"start": 18, "end": 19, "emails_per_inbox": 2}, # Total: 32
 ]
 
 # Weekend days: Match Business days for maximum persistent volume
