@@ -328,9 +328,21 @@ class EmailScheduler:
         results = []
         for prospect in prospects:
             try:
+                # 1. Gather all emails for this prospect
+                target_emails = [prospect.get("email")]
+                import json
+                try:
+                    custom_data_str = prospect.get("custom_data", "{}")
+                    if custom_data_str:
+                        extra_data = json.loads(custom_data_str)
+                        if isinstance(extra_data, dict):
+                            for extra_email in extra_data.keys():
+                                if "@" in extra_email and extra_email not in target_emails:
+                                    target_emails.append(extra_email)
+                except Exception as e:
+                    self.logger.debug(f"Could not parse custom_data emails for {prospect.get('email')}: {e}")
+
                 # Resolve sender email for dynamic sign-off
-                # Logic Update: If inbox_id LOOKS like an email, use it directly. 
-                # Otherwise, try the map.
                 if "@" in str(inbox_id):
                     sender_email = str(inbox_id)
                 else:
@@ -338,11 +350,11 @@ class EmailScheduler:
                     sender_email = self.inbox_map.get(str(inbox_id), "unknown")
                 
                 self.logger.info(f"🔍 DEBUG LOOKUP: ID={inbox_id} -> Sender: {sender_email}")
+                self.logger.info(f"🎯 Target Emails for this school: {target_emails}")
 
-                # Use High-Fidelity Generator
+                # Use High-Fidelity Generator (Generate once per school, send to all contacts)
                 self.logger.info(f"🚀 [SEND START] Generating personalized email for {prospect.get('email')} using sender {sender_email}...")
                 
-                # Note: Sheets Row provides 'school_name', 'domain', 'first_name', 'role', etc.
                 result = self.generator.generate_email(
                     campaign_type=self.profile_config.get("campaign_type", "school"),
                     sequence_number=sequence_number,
@@ -355,46 +367,52 @@ class EmailScheduler:
                 body_text = result['body']
                 body_html = body_text.replace('\n', '<br>')
                 
-                
-                # VERBOSE LOGGING FOR USER VISIBILITY (Consolidated to prevent interleaving)
-                log_msg = [
-                    f"📧 [EMAIL CONTENT] To: {prospect['email']}",
-                    f"Subject: {subject}",
-                    f"--- BODY START ---",
-                    body_text,
-                    f"--- BODY END ---"
-                ]
-                self.logger.debug("\n".join(log_msg))
-                
-                # --- NUCLEAR OPTION: LOCK-BEFORE-SEND ---
-                # Record in suppression BEFORE the API call. 
-                # This ensures literal ZERO chance of retry if the API call hangs or crashes.
-                self.suppression.add_to_suppression(prospect["email"], self.profile_config.get("log_file", "unknown"))
+                # 2. Iterate over every gathered email
+                sent_count = 0
+                for target_email in target_emails:
+                    if self.suppression.is_suppressed(target_email):
+                        self.logger.warning(f"🚫 Skipping already suppressed target: {target_email} in multi-send.")
+                        continue
+                        
+                    # VERBOSE LOGGING FOR USER VISIBILITY
+                    log_msg = [
+                        f"📧 [EMAIL CONTENT] To: {target_email}",
+                        f"Subject: {subject}",
+                        f"--- BODY START ---",
+                        body_text,
+                        f"--- BODY END ---"
+                    ]
+                    self.logger.debug("\n".join(log_msg))
+                    
+                    # --- NUCLEAR OPTION: LOCK-BEFORE-SEND ---
+                    self.suppression.add_to_suppression(target_email, self.profile_config.get("log_file", "unknown"))
 
-                response = self.mailreef.send_email(
-                    inbox_id=inbox_id,
-                    to_email=prospect["email"],
-                    subject=subject,
-                    body=f"<html><body>{body_html}</body></html>",
-                    text_body=body_text
-                )
+                    response = self.mailreef.send_email(
+                        inbox_id=inbox_id,
+                        to_email=target_email,
+                        subject=subject,
+                        body=f"<html><body>{body_html}</body></html>",
+                        text_body=body_text
+                    )
+                    
+                    self.logger.info(f"✅ [SEND SUCCESS] Email sent to {target_email} via inbox {inbox_id}. MsgID: {response.get('message_id')}")
+                    sent_count += 1
+                    
+                    results.append({
+                        "email": target_email,
+                        "status": "sent",
+                        "mailreef_message_id": response.get("message_id")
+                    })
                 
-                self.logger.info(f"✅ [SEND SUCCESS] Email sent to {prospect['email']} via inbox {inbox_id}. MsgID: {response.get('message_id')}")
-                
-                # Sheets-First: Update Status Immediately
-                status = f"email_{sequence_number}_sent"
-                self.sheets.update_lead_status(
-                    email=prospect["email"],
-                    status=status,
-                    sent_at=datetime.now(),
-                    sender_email=sender_email
-                )
-                
-                results.append({
-                    "email": prospect["email"],
-                    "status": "sent",
-                    "mailreef_message_id": response.get("message_id")
-                })
+                # 3. Sheets-First: Update Status Immediately (Updates the primary row representing this school)
+                if sent_count > 0:
+                    status = f"email_{sequence_number}_sent"
+                    self.sheets.update_lead_status(
+                        email=prospect["email"],
+                        status=status,
+                        sent_at=datetime.now(),
+                        sender_email=sender_email
+                    )
             except Exception as e:
                 # Log failure
                 self.logger.error(f"❌ [SEND FAILURE] Failed to send to {prospect.get('email')}: {e}")
