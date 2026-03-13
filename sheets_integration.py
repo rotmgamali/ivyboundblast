@@ -707,30 +707,19 @@ class GoogleSheetsClient:
         self.update_lead_status(update_email, 'replied')
 
     @retry_on_quota
-    def clear_replies(self):
-        """Truncate the replies sheet and write FRESH HEADERS."""
-        worksheet = self.replies_sheet.sheet1
-        worksheet.clear()
-        
-        headers = [
-            "Received At",
-            "From Email",
-            "From Name",
-            "School Name",
-            "Role",
-            "Subject",
-            "Entire Thread",
-            "Sentiment",
-            "Original Sender",
-            "Original Subject",
-            "Thread ID",
-            "Action Taken",
-            "Notes"
-        ]
-        
-        worksheet.append_row(headers)
-        self.apply_formatting()
-        logger.info("🧹 Cleared replies sheet and reset headers.")
+    def clear_worksheet(self, worksheet_name: str):
+        """Truncate a specific worksheet by name while preserving headers."""
+        try:
+            worksheet = self.replies_sheet.worksheet(worksheet_name)
+            headers = worksheet.row_values(1)
+            worksheet.clear()
+            if headers:
+                worksheet.append_row(headers)
+            logger.info(f"🧹 Cleared worksheet '{worksheet_name}' and reset headers.")
+        except gspread.WorksheetNotFound:
+            logger.error(f"❌ Worksheet '{worksheet_name}' not found.")
+        except Exception as e:
+            logger.error(f"❌ Failed to clear worksheet '{worksheet_name}': {e}")
 
     @retry_on_quota
     def apply_formatting(self):
