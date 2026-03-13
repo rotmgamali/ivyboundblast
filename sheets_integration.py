@@ -835,6 +835,90 @@ class GoogleSheetsClient:
         except Exception as e:
             logger.warning(f"⚠️ Could not apply some formatting: {e}")
 
+    @retry_on_quota
+    def color_rows(self, worksheet_name: str, row_colors: List[Dict[str, Any]]):
+        """
+        Color specific rows in a worksheet.
+        row_colors: List of dicts like {'row': 2, 'color': {'red': 1.0, 'green': 0.8, 'blue': 0.8}}
+        """
+        try:
+            worksheet = self.replies_sheet.worksheet(worksheet_name)
+            sheet_id = worksheet.id
+            
+            requests = []
+            for item in row_colors:
+                row_idx = item['row'] - 1 # 0-indexed for API
+                color = item['color']
+                
+                requests.append({
+                    'repeatCell': {
+                        'range': {
+                            'sheetId': sheet_id,
+                            'startRowIndex': row_idx,
+                            'endRowIndex': row_idx + 1,
+                            'startColumnIndex': 0,
+                            'endColumnIndex': 20 # Cover all potential columns
+                        },
+                        'cell': {
+                            'userEnteredFormat': {
+                                'backgroundColor': color
+                            }
+                        },
+                        'fields': 'userEnteredFormat.backgroundColor'
+                    }
+                })
+            
+            if requests:
+                # Chunk requests to avoid payload size limits if many rows
+                for i in range(0, len(requests), 100):
+                    batch = requests[i:i+100]
+                    self.replies_sheet.batch_update({'requests': batch})
+                logger.info(f"🎨 Colored {len(requests)} rows in '{worksheet_name}'.")
+        except Exception as e:
+            logger.error(f"❌ Failed to color rows in '{worksheet_name}': {e}")
+
+    @retry_on_quota
+    def sort_replies(self, worksheet_name: str):
+        """
+        Sort replies by Sentiment (actionable first) and then by Date (descending).
+        """
+        try:
+            worksheet = self.replies_sheet.worksheet(worksheet_name)
+            sheet_id = worksheet.id
+            
+            # Sentiment is Column H (index 7)
+            # Received At is Column A (index 0)
+            
+            body = {
+                "requests": [
+                    {
+                        "sortRange": {
+                            "range": {
+                                "sheetId": sheet_id,
+                                "startRowIndex": 1, # Skip header
+                                "endRowIndex": 1000,
+                                "startColumnIndex": 0,
+                                "endColumnIndex": 13
+                            },
+                            "sortSpecs": [
+                                {
+                                    "dimensionIndex": 7, # Column H (Sentiment)
+                                    "sortOrder": "ASCENDING" # 'actionable' starts with 'a', 'unactionable' starts with 'u'
+                                },
+                                {
+                                    "dimensionIndex": 0, # Column A (Received At)
+                                    "sortOrder": "DESCENDING"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+            self.replies_sheet.batch_update(body)
+            logger.info(f"📊 Sorted replies in '{worksheet_name}' by Sentiment and Date.")
+        except Exception as e:
+            logger.error(f"❌ Failed to sort replies in '{worksheet_name}': {e}")
+
 
 def setup_oauth():
     """Interactive setup for OAuth credentials."""

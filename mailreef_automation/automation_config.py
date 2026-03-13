@@ -61,7 +61,7 @@ SUPPRESSION_SHEET_NAME = "Master Suppression List"
 ACTIVE_REPLIES_WORKSHEET = "March" # Monthly tracking
 
 # Forwarding recipients for real replies
-FORWARD_NOTIFICATIONS_TO = ["cja@ivybound.net", "andrew@web4guru.com"]
+FORWARD_NOTIFICATIONS_TO = ["andrew@web4guru.com"]
 
 CAMPAIGN_CONFIG = {
     "sequence_length": 1,  # 1-email sequence (no follow-ups)
