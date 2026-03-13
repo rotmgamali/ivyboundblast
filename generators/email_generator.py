@@ -155,16 +155,16 @@ class EmailGenerator:
                     self.logger.error(f"❌ [SCRAPE ERROR] Failed for {url}: {e}")
                     website_content = "No website content available."
 
-        # --- 4. Domain Guard & Verification ---
-        if email and url:
-            is_valid, reason = self._validate_domain_association(email, url, website_content, lead_data)
-            if not is_valid:
-                self.logger.warning(f"🚫 [DOMAIN GUARD] Skipping {email}: {reason}")
-                return {
-                    "subject": "SKIP_LEAD",
-                    "body": f"Validation Failed: {reason}"
-                }
-            self.logger.info(f"🛡️ [DOMAIN GUARD] Verified: {reason}")
+        # --- 4. Domain Guard & Verification (DEACTIVATED) ---
+        # if email and url:
+        #     is_valid, reason = self._validate_domain_association(email, url, website_content, lead_data)
+        #     if not is_valid:
+        #         self.logger.warning(f"🚫 [DOMAIN GUARD] Skipping {email}: {reason}")
+        #         return {
+        #             "subject": "SKIP_LEAD",
+        #             "body": f"Validation Failed: {reason}"
+        #         }
+        #     self.logger.info(f"🛡️ [DOMAIN GUARD] Verified: {reason}")
         
         # Parse Custom Data
         custom_json = lead_data.get("custom_data", "{}")
