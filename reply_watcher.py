@@ -145,8 +145,11 @@ class ReplyWatcher:
     def load_state(self) -> dict:
         if os.path.exists(self.state_file):
             with open(self.state_file, 'r') as f:
-                return json.load(f)
-        return {"last_check": (datetime.now() - timedelta(hours=24)).isoformat()}
+                state = json.load(f)
+                if "processed_msg_ids" not in state:
+                    state["processed_msg_ids"] = []
+                return state
+        return {"last_check": (datetime.now() - timedelta(hours=24)).isoformat(), "processed_msg_ids": []}
 
     def save_state(self, state: dict):
         os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
@@ -325,6 +328,7 @@ class ReplyWatcher:
                     msg["body"] = body_text if body_text else msg.get("snippet_preview", "")
                     msg["subject"] = subject
                     msg["date"] = msg_dt.isoformat()
+                    msg["msg_id"] = str(msg.get("id", ""))
                     # Extra context
                     msg["inbox_email"] = msg.get("to")[0] if msg.get("to") else "unknown"
                     
@@ -436,6 +440,7 @@ Return ONLY one word: positive, negative, or neutral."""
     def process_replies(self):
         state = self.load_state()
         last_check_str = state.get("last_check")
+        processed_msg_ids = set(state.get("processed_msg_ids", []))
         
         # Add a 1-hour safety overlap to catch anything missed by transient errors
         try:
@@ -456,6 +461,11 @@ Return ONLY one word: positive, negative, or neutral."""
         latest_successful_dt = last_check_dt
         
         for reply in replies:
+            msg_id = reply.get('msg_id', '')
+            if msg_id and msg_id in processed_msg_ids:
+                logger.debug(f"⏭️ [SKIP] Already processed reply ID {msg_id}")
+                continue
+                
             from_email = reply.get('from_email')
             body = reply.get('body', '')
             subject = reply.get('subject', '')
@@ -479,6 +489,9 @@ Return ONLY one word: positive, negative, or neutral."""
             }
             try:
                 self.sheets_client.log_reply(reply_data)
+                
+                if msg_id:
+                    processed_msg_ids.add(msg_id)
                 
                 # Update latest successful timestamp
                 if reply_date_str:
@@ -510,6 +523,8 @@ Return ONLY one word: positive, negative, or neutral."""
                         
         # Save the updated state so we don't process these again
         state["last_check"] = latest_successful_dt.isoformat()
+        # Keep only the last 5000 processed IDs to prevent the state file from growing infinitely
+        state["processed_msg_ids"] = list(processed_msg_ids)[-5000:]
         self.save_state(state)
         logger.info("✅ Reply check cycle completed.")
                         
