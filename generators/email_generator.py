@@ -134,18 +134,18 @@ class EmailGenerator:
                 self.logger.warning(f"⚠️ Skipping scrape for Google URL: {url}")
                 website_content = "Scraper skipped for Google URL."
             else:
-                self.logger.debug(f"🌍 [SCRAPE] Attempting to scrape {campaign_type} site: {url}...")
                 try:
                     if not url.startswith("http"):
                         url = "https://" + url
                     
-                    # Choose the right scraper
+                    # Try external scrapers first
                     if campaign_type == "b2b" and b2b_scraper:
                         website_content = b2b_scraper.scrape_b2b_text(url)
                     elif school_scraper:
                         website_content = school_scraper.scrape_website_text(url)
                     else:
-                        website_content = "Scraper unavailable."
+                        # FALLBACK: Built-in robust scraper
+                        website_content = self._fallback_scrape(url)
 
                     if website_content and len(website_content) > 100:
                         self.logger.debug(f"✅ [SCRAPE SUCCESS] Found {len(website_content)} characters for personalization.")
@@ -201,14 +201,49 @@ class EmailGenerator:
         # Call LLM for Body & Subject
         llm_result = self._call_llm(user_prompt, system_prompt)
         
+        self.logger.info(f"✍️ [LLM RESULT] Subject: {llm_result.get('subject')}")
+        self.logger.info(f"✍️ [LLM RESULT] Body Snippet: {llm_result.get('body')[:100]}...")
+        
         # --- ENVELOPE REASSEMBLY ---
         clean_body = self._strip_hallucinations(llm_result['body'], envelope['greeting'], envelope['sign_off'])
-        final_body = f"{envelope['greeting']}\n\n{clean_body}\n\n{envelope['sign_off']}"
+        
+        # FINAL PROTECTION: Ensure no "Hi [Name]" if we already have it in clean_body
+        final_greeting = envelope['greeting']
+        if clean_body.lower().startswith("hi ") or clean_body.lower().startswith("good "):
+            # AI hallucinated a greeting, let's just use the AI's if it's there, 
+            # or trust our deterministic one. Deterministic is safer.
+            first_line = clean_body.split('\n')[0]
+            if "," in first_line and len(first_line) < 30:
+                clean_body = "\n".join(clean_body.split('\n')[1:]).strip()
+
+        final_body = f"{final_greeting}\n\n{clean_body}\n\n{envelope['sign_off']}"
         
         return {
-            "subject": envelope['subject'],
+            "subject": llm_result.get('subject') or envelope['subject'],
             "body": final_body
         }
+
+    def _fallback_scrape(self, url: str) -> str:
+        """Internal lightweight scraper for website text."""
+        import requests
+        from bs4 import BeautifulSoup
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+            response = requests.get(url, headers=headers, timeout=15, verify=False)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                # Remove script/style
+                for s in soup(["script", "style"]):
+                    s.decompose()
+                text = soup.get_text(separator=' ')
+                # Clean whitespace
+                lines = (line.strip() for line in text.splitlines())
+                chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+                text = ' '.join(chunk for chunk in chunks if chunk)
+                return text[:5000]
+        except Exception as e:
+            self.logger.error(f"Fallback scrape failed: {e}")
+        return ""
 
     def _get_archetype(self, role: str) -> str:
         """Map job title to archetype folder name."""
@@ -471,59 +506,63 @@ Respond in JSON only:
         envelope = {
             "greeting": greeting_line,
             "sign_off": sign_off_block,
-            "subject": template_subject
+            "subject": template_subject # Default, AI will override if instructed
         }
         
         # --- 5. System Prompt (Constraint) ---
-        system_prompt = f"""You are {sender_name}, a helpful consultant.
+        system_prompt = f"""You are {sender_name}, a helpful education consultant.
         
 STYLE GUIDE:
-- Tone: Human, warm, brief, and professional.
-- Formatting: Use paragraphs only.
+- Tone: Human, warm, brief, and professional. NO CORPORATE JARGON.
+- Formatting: Use paragraphs only. Spaced out.
 - Absolute Rules:
   1. DO NOT include a greeting (e.g. "Hi...").
   2. DO NOT include a sign-off (e.g. "Best, Mark").
   3. OUTPUT ONLY the Subject and the Body paragraphs.
 
-- IF PUBLIC: Focus on district alignment, budget efficiency, and improving standardized test scores.
+- IF PUBLIC: Focus on district alignment, budget efficiency, and test scores.
 - IF PRIVATE: Focus on enrollment, prestige, and college matriculation.
 
 PLACEHOLDER POLICY:
-- NEVER use brackets or parentheses for unknown data (e.g., NO [City], NO (Name)).
-- If a piece of information is missing or you are unsure, simply omit it or use a natural, generic phrase.
+- NEVER use brackets or parentheses for unknown data.
+- If unsure, OMIT or use a natural, generic phrase.
 """
 
-        # --- 6. User Prompt (Body Generation) ---
-        user_prompt = f"""Here is the CORE CONTENT of an email I want to send to {first_name} ({lead_data.get('role', 'Executive')}) at what is currently identified as "{school_name}" in my records.
-        
-CRITICAL SOURCE OF TRUTH:
-The identification "{school_name}" may be inaccurate. You MUST read the RESEARCH HIGHLIGHTS (Web Scrape) below and determine the actual, correct school name. Use the name you find in the website text for all references in the email.
+        # --- 6. User Prompt (Body & Subject Generation) ---
+        user_prompt = f"""You are a local parent/neighbor writing a 1-to-1 email to {first_name} at "{school_name}".
+
+RESEARCH HIGHLIGHTS (Live Web Scrape):
+{website_content[:4500]}
 
 DRAFT CONTENT:
 '''
 {clean_draft}
 '''
 
-LEAD CONTEXT (Use this where appropriate):
+LEAD CONTEXT:
 {custom_context}
 
-RESEARCH HIGHLIGHTS (Live Web Scrape - THE SOURCE OF TRUTH):
-{website_content[:3000]}
-
 TASK:
-1. Identify the CORRECT SCHOOL NAME from the RESEARCH HIGHLIGHTS.
-2. Rewrite the DRAFT CONTENT to make it feel personal and handwritten.
-3. Use the LEAD CONTEXT and RESEARCH HIGHLIGHTS (programs, mission, location) to show you've done your homework.
-4. write ONLY the body paragraphs. 
-5. NO GREETINGS (Hi..., Good morning...).
-6. NO SIGN-OFFS (Best..., Andrew...).
-7. NO PLACEHOLDERS: Do not use [City], (city), [Name], etc. 
+1. SUBJECT LINE: Write a 2-4 word "Insider" subject line.
+   - It must look like a casual email from a local.
+   - EXAMPLES of what I want: "Go [Mascot Name]!", "[Neighborhood Name] families", "Question about [Local Event]", "[City Nickname] student support", "[Specific Program Name] question".
+   - DO NOT use: "Question", "Resources", "Test Prep", "Introduction", or the school's full formal name.
+   - If you find a mascot or a specific local street/park in the research, use it.
 
-Keep the response under 100 words.
+2. BODY: Rewrite the DRAFT CONTENT to be deeply personalized. 
+   - Reference a specific detail found in the RESEARCH (e.g., a specific teacher's award, a unique elective, a recent social media post mentioned on the site).
+   - The tone must be "I saw this on your site and it made me think of..." rather than "I am a consultant...".
+
+3. CONSTRAINTS:
+   - NO GREETINGS or SIGN-OFFS.
+   - NO PLACEHOLDERS.
+   - KEEP IT UNDER 75 WORDS.
 
 Output format:
-SUBJECT: [Personalized Subject]
+SUBJECT: [Insider Subject]
+
 BODY: [Paragraph 1]
+
 [Paragraph 2]
 """
         return system_prompt, user_prompt, envelope
