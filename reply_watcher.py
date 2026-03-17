@@ -489,22 +489,29 @@ Return ONLY one word: positive, negative, or neutral."""
             }
             try:
                 self.sheets_client.log_reply(reply_data)
-                
-                if msg_id:
-                    processed_msg_ids.add(msg_id)
-                
-                # Update latest successful timestamp
-                if reply_date_str:
-                    try:
-                        reply_dt = datetime.fromisoformat(reply_date_str.replace('Z', '+00:00'))
-                        # Remove timezone info for comparison with last_check_dt if needed
-                        reply_dt = reply_dt.replace(tzinfo=None)
-                        if reply_dt > latest_successful_dt:
-                            latest_successful_dt = reply_dt
-                    except Exception as te:
-                        logger.error(f"Time parse error: {te}")
             except Exception as e:
                 logger.error(f"❌ Failed to log to sheets: {e}")
+                continue # Do not add to processed_ids if it failed to log
+                
+            # If we reached here, logging was successful. 
+            # SAVE STATE IMMEDIATELY to prevent redunant processing on crash.
+            if msg_id:
+                processed_msg_ids.add(msg_id)
+            
+            # Update latest successful timestamp
+            if reply_date_str:
+                try:
+                    reply_dt = datetime.fromisoformat(reply_date_str.replace('Z', '+00:00'))
+                    reply_dt = reply_dt.replace(tzinfo=None)
+                    if reply_dt > latest_successful_dt:
+                        latest_successful_dt = reply_dt
+                except Exception as te:
+                    logger.error(f"Time parse error: {te}")
+
+            # Persistent save
+            state["last_check"] = latest_successful_dt.isoformat()
+            state["processed_msg_ids"] = list(processed_msg_ids)[-5000:]
+            self.save_state(state)
                 
             
             # 4. (Removed Telegram Alert functionality)

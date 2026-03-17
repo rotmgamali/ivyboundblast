@@ -433,7 +433,7 @@ Respond in JSON only:
                     first_name = f"{title} {first_name}"
                     break
             greeting_line = f"Hi {first_name},"
-        elif role and len(role) > 2 and role.lower() not in ["high school", "middle school", "elementary school", "pk-12"]:
+        elif role and len(role) > 2 and role.lower() not in ["high school", "middle school", "elementary school", "pk-12", "preschool", "academy"]:
             # Fallback to Role-based (e.g. Hi Principal,)
             first_name = role.title()
             greeting_line = f"Hi {first_name},"

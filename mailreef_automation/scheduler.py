@@ -411,7 +411,8 @@ class EmailScheduler:
                         email=prospect["email"], 
                         status="invalid_association",
                         sent_at=datetime.now(),
-                        sender_email=sender_email
+                        sender_email=sender_email,
+                        content=body_text
                     )
                     continue
 
@@ -461,7 +462,8 @@ class EmailScheduler:
                         email=prospect["email"],
                         status=status,
                         sent_at=datetime.now(),
-                        sender_email=sender_email
+                        sender_email=sender_email,
+                        content=body_text
                     )
             except Exception as e:
                 # Log failure

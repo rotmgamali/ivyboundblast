@@ -27,7 +27,7 @@ def sync_historical_replies(profile_name="IVYBOUND"):
     
     # User's Profile Config
     profile_config = automation_config.CAMPAIGN_PROFILES[profile_name]
-    worksheet_name = profile_config.get("replies_worksheet_name", "March")
+    worksheet_name = profile_config.get("replies_worksheet_name", getattr(automation_config, "ACTIVE_REPLIES_WORKSHEET", "Sheet 1"))
     
     # 2. Clear the target worksheet
     logger.info(f"🧹 Clearing worksheet: {worksheet_name}")
@@ -89,9 +89,11 @@ def sync_historical_replies(profile_name="IVYBOUND"):
                     }
                     
                     try:
-                        sheets.log_reply(reply_data)
-                        found_count += 1
-                        logger.info(f"✅ Logged reply {found_count} from {from_email}")
+                        if sheets.log_reply(reply_data):
+                            found_count += 1
+                            logger.info(f"✅ Logged reply {found_count} from {from_email}")
+                        else:
+                            logger.info(f"⏭️ Skipped duplicate from {from_email}")
                     except Exception as le:
                         logger.error(f"❌ Failed to log reply from {from_email}: {le}")
                         

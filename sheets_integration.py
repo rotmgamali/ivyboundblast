@@ -287,7 +287,6 @@ class GoogleSheetsClient:
             "last_name",
             "role",
             "school_name",
-            "school_type",
             "domain",
             "state",
             "city",
@@ -297,7 +296,7 @@ class GoogleSheetsClient:
             "email_2_sent_at",
             "sender_email",
             "notes",
-            "custom_data"
+            "school_type"
         ]
         
         # Calculate exactly based on headers list to avoid [400] error
@@ -360,26 +359,9 @@ class GoogleSheetsClient:
             self.setup_sheets()
             
         worksheet = self.input_sheet.sheet1
+        headers = worksheet.row_values(1)
         
-        # Exact header lineup based on _setup_input_sheet_headers
-        row = [
-            data.get("email", ""),
-            data.get("first_name", ""),
-            data.get("last_name", ""),
-            data.get("role", ""),
-            data.get("school_name", ""),
-            data.get("school_type", ""),
-            data.get("domain", ""),
-            data.get("state", ""),
-            data.get("city", ""),
-            str(data.get("phone", "")),
-            data.get("status", "pending"),
-            data.get("email_1_sent_at", ""),
-            data.get("email_2_sent_at", ""),
-            data.get("sender_email", ""),
-            data.get("notes", ""),
-            data.get("custom_data", "")
-        ]
+        row = self._map_data_to_row(data, headers)
         
         try:
             worksheet.append_row(row, value_input_option='USER_ENTERED')
@@ -388,6 +370,26 @@ class GoogleSheetsClient:
         except Exception as e:
             logger.error(f"Failed to add lead {data.get('email')}: {e}")
             return False
+
+    def _map_data_to_row(self, data: Dict[str, Any], headers: List[str]) -> List[Any]:
+        """Maps a dictionary of lead data to a list of values based on sheet headers."""
+        row = []
+        for header in headers:
+            norm_header = header.lower().strip().replace(' ', '_')
+            
+            # Direct match
+            value = data.get(norm_header)
+            
+            # Synonym matches if missing
+            if value is None:
+                if norm_header == 'role': value = data.get('title') or data.get('position')
+                elif norm_header == 'domain': value = data.get('website') or data.get('url')
+                elif norm_header == 'school_name': value = data.get('school') or data.get('company')
+                elif norm_header == 'school_type': value = data.get('type')
+                elif norm_header == 'status': value = 'pending'
+            
+            row.append(str(value) if value is not None else "")
+        return row
 
     @retry_on_quota
     def add_leads_batch(self, leads_data: List[Dict[str, Any]]) -> bool:
@@ -417,26 +419,8 @@ class GoogleSheetsClient:
         if len(verified_leads) < len(leads_data):
             logger.info(f"🔒 Verification gate: {len(verified_leads)}/{len(leads_data)} leads passed verification check.")
         
-        rows = []
-        for data in verified_leads:
-            rows.append([
-                data.get("email", ""),
-                data.get("first_name", ""),
-                data.get("last_name", ""),
-                data.get("role", ""),
-                data.get("school_name", ""),
-                data.get("school_type", ""),
-                data.get("domain", ""),
-                data.get("state", ""),
-                data.get("city", ""),
-                str(data.get("phone", "")),
-                data.get("status", "pending"),
-                data.get("email_1_sent_at", ""),
-                data.get("email_2_sent_at", ""),
-                data.get("sender_email", ""),
-                data.get("notes", ""),
-                data.get("custom_data", "")
-            ])
+        headers = worksheet.row_values(1)
+        rows = [self._map_data_to_row(lead, headers) for lead in verified_leads]
             
         try:
             worksheet.append_rows(rows, value_input_option='USER_ENTERED')
@@ -532,7 +516,8 @@ class GoogleSheetsClient:
     @retry_on_quota
     def update_lead_status(self, email: str, status: str, 
                            sent_at: Optional[datetime] = None,
-                           sender_email: Optional[str] = None):
+                           sender_email: Optional[str] = None,
+                           content: Optional[str] = None):
         """Update a lead's status after sending an email."""
         worksheet = self.input_sheet.sheet1
         
@@ -562,38 +547,36 @@ class GoogleSheetsClient:
             cell_list.append(gspread.Cell(row, status_col, status))
             
             if sent_at:
-                if status == 'email_1_sent':
-                    col = headers.index('email_1_sent_at') + 1
-                elif status == 'email_2_sent':
-                    col = headers.index('email_2_sent_at') + 1
-                elif status == 'replied':
-                     # We don't have a 'replied_at' column necessarily, but we can add one if needed.
-                     # For now, just update status.
-                     col = None
-                else:
-                    col = None
+                at_col = None
+                content_col = None
                 
-                if col:
-                    cell_list.append(gspread.Cell(row, col, sent_at.isoformat()))
+                if status == 'email_1_sent':
+                    if 'email_1_sent_at' in headers: at_col = headers.index('email_1_sent_at') + 1
+                    if 'email_1_content' in headers: content_col = headers.index('email_1_content') + 1
+                elif status == 'email_2_sent':
+                    if 'email_2_sent_at' in headers: at_col = headers.index('email_2_sent_at') + 1
+                    if 'email_2_content' in headers: content_col = headers.index('email_2_content') + 1
+                
+                if at_col:
+                    cell_list.append(gspread.Cell(row, at_col, sent_at.isoformat()))
+                if content_col and content:
+                    cell_list.append(gspread.Cell(row, content_col, content))
             
-            if sender_email:
-                try:
-                    sender_col = headers.index('sender_email') + 1
-                    cell_list.append(gspread.Cell(row, sender_col, sender_email))
-                except ValueError:
-                    pass # sender_email column might not exist
+            if sender_email and 'sender_email' in headers:
+                sender_col = headers.index('sender_email') + 1
+                cell_list.append(gspread.Cell(row, sender_col, sender_email))
+
             # Perform Batch Update
-            worksheet.update_cells(cell_list)
-            logger.info(f"✓ Updated status for {email} (Row {row}) to {status}")
+            if cell_list:
+                worksheet.update_cells(cell_list)
+                logger.info(f"✓ Updated context for {email} (Row {row}) to {status}")
             
             # --- CRITICAL BUG FIX (DUPLICATE EMAILS) ---
-            # Even on success, we MUST update the local memory cache immediately.
-            # Otherwise, get_pending_leads will continue returning this email as "pending"
-            # for up to 5 minutes until the global records cache expires.
             if email in self._cache:
                 self._cache[email].update({
                     'status': status,
-                    'sender_email': sender_email or self._cache[email].get('sender_email')
+                    'sender_email': sender_email or self._cache[email].get('sender_email'),
+                    'email_1_content': content if status == 'email_1_sent' else self._cache[email].get('email_1_content')
                 })
                 
         except Exception as e:
@@ -613,17 +596,35 @@ class GoogleSheetsClient:
     @retry_on_quota
     def log_reply(self, reply_data: Dict[str, Any]):
         """Log a reply to the replies sheet, auto-enriching with lead data if possible."""
+        if not self.replies_sheet:
+            self.setup_sheets()
+
         if self.replies_worksheet_name:
             try:
                 worksheet = self.replies_sheet.worksheet(self.replies_worksheet_name)
             except gspread.WorksheetNotFound:
-                # Fallback to sheet1 if named worksheet not found
                 logger.warning(f"⚠️ Worksheet '{self.replies_worksheet_name}' not found. Falling back to first sheet.")
                 worksheet = self.replies_sheet.sheet1
         else:
             worksheet = self.replies_sheet.sheet1
-        
+            
         from_email = str(reply_data.get('from_email', '')).lower().strip()
+        received_at = str(reply_data.get('received_at', ''))
+        subject = str(reply_data.get('subject', '')).strip()
+
+        # --- DUPLICATE CHECK ---
+        # Fetch existing to compare. Optimization: Cache for 60s
+        now = time.time()
+        if not hasattr(self, '_replies_cache') or not hasattr(self, '_replies_cache_time') or (now - self._replies_cache_time > 60):
+            self._replies_cache = worksheet.get_all_records()
+            self._replies_cache_time = now
+            
+        for r in self._replies_cache:
+            if str(r.get('From Email', '')).lower().strip() == from_email and \
+               str(r.get('Received At', '')) == received_at and \
+               str(r.get('Subject', '')).strip() == subject:
+                logger.info(f"⏭️ [DUPE] Already logged reply from {from_email}")
+                return False
         
         # --- AUTO-ENRICHMENT ---
         school_name = reply_data.get('school_name', '')
@@ -705,9 +706,59 @@ class GoogleSheetsClient:
         # CRITICAL: Use the lead's actual email if found via domain/enrichment
         update_email = lead.get('email', from_email) if lead else from_email
         self.update_lead_status(update_email, 'replied')
+        return True
 
     @retry_on_quota
     def clear_worksheet(self, worksheet_name: str):
+        """Truncate a specific worksheet by name while preserving headers."""
+        try:
+            worksheet = self.replies_sheet.worksheet(worksheet_name)
+            headers = worksheet.row_values(1)
+            worksheet.clear()
+            if headers:
+                worksheet.append_row(headers)
+            logger.info(f"✅ Cleared worksheet: {worksheet_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to clear worksheet {worksheet_name}: {e}")
+            return False
+
+    @retry_on_quota
+    def clear_march_replies(self, worksheet_name: str = None):
+        """NUCLEAR OPTION: Clear all March 2026 replies to allow for a clean re-sync."""
+        try:
+            if worksheet_name:
+                worksheet = self.replies_sheet.worksheet(worksheet_name)
+            else:
+                worksheet = self.replies_sheet.sheet1
+                
+            headers = worksheet.row_values(1)
+            all_data = worksheet.get_all_values()
+            
+            # Filter out March 2026
+            kept_rows = [headers]
+            count = 0
+            for row in all_data[1:]:
+                # Column A is 'Received At'
+                received = row[0]
+                is_march = False
+                if '2026-03' in received:
+                    is_march = True
+                
+                if is_march:
+                    count += 1
+                else:
+                    kept_rows.append(row)
+            
+            if count > 0:
+                logger.info(f"🧹 Clearing {count} March 2026 replies...")
+                worksheet.clear()
+                worksheet.update('A1', kept_rows)
+                logger.info("✅ March replies cleared. System ready for re-sync.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to clear March replies: {e}")
+            return False
         """Truncate a specific worksheet by name while preserving headers."""
         try:
             worksheet = self.replies_sheet.worksheet(worksheet_name)

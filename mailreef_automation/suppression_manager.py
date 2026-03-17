@@ -174,11 +174,14 @@ class SuppressionManager:
             logger.info(f"📤 Successfully synced {len(local_items)} emails to '{SUPPRESSION_SHEET_NAME}'")
             
         except Exception as e:
-            logger.error(f"❌ Failed to sync to sheets: {e}")
+            if "storageQuotaExceeded" in str(e) or "[403]" in str(e):
+                logger.warning("⚠️ Google Drive Quota Exceeded. Suppression sync skipped, using local DB only.")
+            else:
+                logger.error(f"❌ Failed to sync to sheets: {e}")
 
     def sync_from_sheets(self):
         """
-        Pull from Master Suppression sheet to local DB. Useful on container startup.
+        Pull from Master Suppression sheet to local DB.
         """
         try:
             sheets = GoogleSheetsClient(input_sheet_name=SUPPRESSION_SHEET_NAME)
@@ -193,7 +196,10 @@ class SuppressionManager:
             self.bulk_add(emails, campaign="SHEETS_SYNC")
             
         except Exception as e:
-            logger.error(f"❌ Failed to sync from sheets: {e}")
+            if "storageQuotaExceeded" in str(e) or "[403]" in str(e):
+                logger.warning("⚠️ Google Drive Quota Exceeded during pull. Continuing with local DB.")
+            else:
+                logger.error(f"❌ Failed to sync from sheets: {e}")
 
 if __name__ == "__main__":
     # Test
