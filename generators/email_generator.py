@@ -553,27 +553,28 @@ LEAD CONTEXT:
 {custom_context}
 
 TASK:
-1. SUBJECT LINE: Write a 2-4 word "Insider" subject line.
-   - It must look like a casual email from a local.
-   - EXAMPLES of what I want: "Go [Mascot Name]!", "[Neighborhood Name] families", "Question about [Local Event]", "[City Nickname] student support", "[Specific Program Name] question".
-   - DO NOT use: "Question", "Resources", "Test Prep", "Introduction", or the school's full formal name.
-   - If you find a mascot or a specific local street/park in the research, use it.
+    1. SUBJECT LINE: Write a 2-4 word "Insider" subject line based on the RESEARCH.
+       - EXAMPLES: "Go [Mascot]!", "[Program Name] question", "Question for [School Name] families".
+       - DO NOT use generic terms like "Checking in" or "Scholarship".
 
-2. BODY: Rewrite the DRAFT CONTENT to be deeply personalized. 
-   - Reference a specific detail found in the RESEARCH (e.g., a specific teacher's award, a unique elective, a recent social media post mentioned on the site).
-   - The tone must be "I saw this on your site and it made me think of..." rather than "I am a consultant...".
+    2. BODY: Take the provided DRAFT CONTENT and INCREASE the personalization by blending in a specific detail from the RESEARCH.
+       - IMPORTANT: You MUST keep the core messaging about the $375 program, the $15,000 in aid, and the the offer of a 10-minute chat. 
+       - DO NOT shorten the email significantly. The length of the draft is intentional.
+       - Blend the personalized observation into the first or second paragraph naturally.
+    
+    3. CONSTRAINTS:
+       - NO GREETINGS or SIGN-OFFS.
+       - NO PLACEHOLDERS.
+       - Keep the word count between 100-150 words to maintain the professional case-study tone.
 
-3. CONSTRAINTS:
-   - NO GREETINGS or SIGN-OFFS.
-   - NO PLACEHOLDERS.
-   - KEEP IT UNDER 75 WORDS.
+    Output format:
+    SUBJECT: [Insider Subject]
 
-Output format:
-SUBJECT: [Insider Subject]
+    BODY: [Personalized Paragraph 1]
 
-BODY: [Paragraph 1]
+    [Paragraph 2]
 
-[Paragraph 2]
+    [Paragraph 3]
 """
         return system_prompt, user_prompt, envelope
 
