@@ -108,10 +108,28 @@ class EmailGenerator:
         email = lead_data.get("email", "")
         url = lead_data.get("website") or lead_data.get("domain")
         
-        # --- 1. Identify Archetype ---
+        # --- Institution Type Guard (Strict K-12 Filter) ---
+        EXCLUDED_KEYWORDS = [
+            'surf', 'flight', 'preschool', 'pre-school', 'university', 'college', 
+            'gym', 'dance', 'martial arts', 'childcare', 'daycare', 'early learning',
+            'nursery', 'ballet', 'yoga', 'tennis', 'soccer', 'swimming', 'driving school',
+            'learning center', 'academy of art', 'beauty academy', 'kindergarten'
+        ]
+        school_name = (lead_data.get("school_name") or "").lower()
         role = (lead_data.get("role") or "").lower()
-        archetype = self._get_archetype(role)
-        _logger.debug(f"🎯 [GEN] {campaign_type.upper()} Archetype: {archetype} (detected from role: '{role}')")
+        full_text = f"{school_name} {role}"
+        
+        if any(keyword in full_text for keyword in EXCLUDED_KEYWORDS):
+            self.logger.warning(f"🚫 [INSTITUTION GUARD] Skipping non-traditional lead: {full_text}")
+            return {
+                "subject": "SKIP_LEAD",
+                "body": "Validation Failed: Non-Traditional Institution (Not K-12 Middle/High School)"
+            }
+
+        # --- 1. Identify Archetype ---
+        role_clean = role.strip()
+        archetype = self._get_archetype(role_clean)
+        _logger.debug(f"🎯 [GEN] {campaign_type.upper()} Archetype: {archetype} (detected from role: '{role_clean}')")
         
         # --- 2. Load Template ---
         template_content = self._load_template_file(campaign_type, archetype, sequence_number)
