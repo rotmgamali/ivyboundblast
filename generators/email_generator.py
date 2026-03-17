@@ -420,21 +420,31 @@ Respond in JSON only:
         # Name & Greeting Logic
         raw_name = lead_data.get("first_name", "")
         sanitized = self._sanitize_name(raw_name, lead_data)
+        role = lead_data.get("role", "").strip()
+        school_name = lead_data.get("school_name") or lead_data.get("company_name") or "your school"
         
         if sanitized:
             first_name = sanitized
             # Religious Titles
-            role = lead_data.get("role", "").lower()
+            role_lower = role.lower()
             religious_titles = {"pastor": "Pastor", "reverend": "Reverend", "rev.": "Reverend", "father": "Father", "rabbi": "Rabbi"}
             for keyword, title in religious_titles.items():
-                if keyword in role and title.lower() not in first_name.lower():
+                if keyword in role_lower and title.lower() not in first_name.lower():
                     first_name = f"{title} {first_name}"
                     break
             greeting_line = f"Hi {first_name},"
+        elif role and len(role) > 2 and role.lower() not in ["high school", "middle school", "elementary school", "pk-12"]:
+            # Fallback to Role-based (e.g. Hi Principal,)
+            first_name = role.title()
+            greeting_line = f"Hi {first_name},"
+        elif school_name and school_name.lower() != "your school":
+            # Fallback to School-based Team
+            greeting_line = f"To the {school_name} Team,"
+            first_name = "Team"
         else:
-            # Fallback to Time-Based
-            greeting_line = f"{self._get_time_greeting()},"
-            first_name = "School Leader" # Default for prompt context
+            # Absolute fallback
+            greeting_line = "Hi,"
+            first_name = "School Leader"
             
         # Sender Logic
         sender_name = "Andrew"
@@ -571,9 +581,12 @@ BODY: [Paragraph 1]
         """Failsafe: If AI wrote 'Hi Andrew,' or 'Best, Name' anyway, remove it."""
         lines = body_text.split("\n")
         
-        # 1. Strip Leading Greeting
-        if lines and any(g.lower() in lines[0].lower() for g in ["hi", "dear", "good morning", "good afternoon", "good evening", "hello"]):
-            if "," in lines[0]:
+        # 1. Strip Leading Greeting (be very thorough)
+        greeting_markers = ["hi", "dear", "good morning", "good afternoon", "good evening", "hello", "to the", "attention"]
+        if lines and any(g.lower() in lines[0].lower() for g in greeting_markers):
+            # Check if it looks like a greeting (short, ends in comma/colon)
+            first_line = lines[0].strip()
+            if "," in first_line or ":" in first_line or len(first_line) < 40:
                 lines = lines[1:]
                 
         # 2. Strip Trailing Sign-off

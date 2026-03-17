@@ -1,12 +1,10 @@
-Subject: {{ school_name }} families and college prep
+Subject: Scholarship ROI for {{ school_name }} families
 
-Hi {{ first_name }},
+Following up on my previous note to {{ school_name }}. Most of the School Directors we partner with are currently focused on maximizing college financial aid opportunities for their families.
 
-I've been reviewing your admissions materials at {{ school_name }}—it's clear that your community values both academic excellence and student success.
+We’ve found that our $375 intensive test prep program is often the deciding factor in students qualifying for merit-based scholarships—averaging over $15,000 in aid per student. 
 
-In your role as Director of Admissions, I imagine you're often speaking with prospective families about college readiness. I'm curious how you're currently addressing their questions about test prep support. I work with independent schools to provide resources that families genuinely appreciate during the enrollment process.
+For your families, this represents a significant value-add that costs the school nothing to implement. Is this something you'd be open to discussing for 10 minutes? I'd love to share the case study from comparable schools.
 
-Would you have a few minutes for a quick chat? I'd love to hear your insights.
-
-Best,
-Andrew, Aspire Academy
+Best regards,
+Mark Greenstein
