@@ -343,11 +343,13 @@ class GoogleSheetsClient:
             "Original Subject",
             "Thread ID",
             "Action Taken",     # replied, forwarded, scheduled_meeting
-            "Notes"
+            "Notes",
+            "Intent",           # HOT_BOOK_CALL / WARM_INTERESTED / QUESTION / OBJECTION_* / REFERRAL / OUT_OF_OFFICE / NEGATIVE / UNCLEAR
+            "Suggested Reply",  # AI-drafted response for the user to review and send
         ]
-        
-        worksheet.update('A1:M1', [headers])
-        worksheet.format('A1:M1', {
+
+        worksheet.update('A1:O1', [headers])
+        worksheet.format('A1:O1', {
             'textFormat': {'bold': True},
             'backgroundColor': {'red': 0.2, 'green': 0.6, 'blue': 0.4}
         })
@@ -696,6 +698,25 @@ class GoogleSheetsClient:
                         # Fallback: if we still don't have a lead, but it's clearly a reply to us
                         # we still log it as 'Neutral' sender in log_reply (already handled by defaults)
 
+        # Make sure the new Intent + Suggested Reply columns exist on the
+        # live sheet (it may pre-date this schema). Idempotent: only writes
+        # if those header cells are blank.
+        try:
+            current_headers = worksheet.row_values(1)
+            if len(current_headers) < 14 or (current_headers[13] if len(current_headers) > 13 else '') != "Intent":
+                worksheet.update_cell(1, 14, "Intent")
+            if len(current_headers) < 15 or (current_headers[14] if len(current_headers) > 14 else '') != "Suggested Reply":
+                worksheet.update_cell(1, 15, "Suggested Reply")
+        except Exception as e:
+            logger.warning(f"Could not ensure Intent/Suggested Reply headers: {e}")
+
+        # Use snippet from upstream parser if present, else fall back to entire_thread
+        body_text = (
+            reply_data.get('snippet')
+            or reply_data.get('body_text')
+            or reply_data.get('entire_thread', '')
+        )
+
         row = [
             reply_data.get('received_at', datetime.now().isoformat()),
             from_email,
@@ -703,16 +724,18 @@ class GoogleSheetsClient:
             school_name,
             role,
             reply_data.get('subject', ''),
-            reply_data.get('snippet', reply_data.get('body_text', '')),
+            body_text,
             reply_data.get('sentiment', 'neutral'),
             reply_data.get('original_sender', ''),
             reply_data.get('original_subject', ''),
             reply_data.get('thread_id', ''),
             reply_data.get('action_taken', ''),
-            reply_data.get('notes', '')
+            reply_data.get('notes', ''),
+            reply_data.get('intent', 'UNCLEAR'),
+            reply_data.get('suggested_reply', ''),
         ]
-        
-        worksheet.append_row(row)
+
+        worksheet.append_row(row, value_input_option='USER_ENTERED')
         logger.info(f"Logged reply from {from_email}")
         
         # Also update the lead status in input sheet

@@ -339,6 +339,140 @@ class ReplyWatcher:
         
         return replies
 
+    # Intents we route on. HOT/WARM/QUESTION get an AI-drafted response;
+    # NEGATIVE drives suppression; OUT_OF_OFFICE/REFERRAL/UNCLEAR are logged
+    # for human review without a draft.
+    INTENT_LABELS = (
+        "HOT_BOOK_CALL",     # explicit ask to schedule / "send me a calendar link"
+        "WARM_INTERESTED",   # interested but not asking for a meeting yet
+        "QUESTION",          # asking for pricing/details/clarification
+        "OBJECTION_PRICE",   # cost / budget concern
+        "OBJECTION_TIMING",  # not now / try later / busy season
+        "REFERRAL",          # forwarding to a colleague or saying who to contact
+        "OUT_OF_OFFICE",     # automatic OOO bounce
+        "NEGATIVE",          # opt-out / unsubscribe / not interested
+        "UNCLEAR",
+    )
+    DRAFT_INTENTS = {"HOT_BOOK_CALL", "WARM_INTERESTED", "QUESTION", "OBJECTION_PRICE", "OBJECTION_TIMING"}
+    NEGATIVE_INTENTS = {"NEGATIVE"}
+
+    def classify_intent(self, reply_text: str, lead_role: str = "") -> str:
+        """Multi-class intent of a reply. Returns one of INTENT_LABELS."""
+        text = (reply_text or "").strip()
+        if not text:
+            return "UNCLEAR"
+        prompt = f"""Classify this email reply from a recipient of cold outreach.
+
+Reply text:
+\"\"\"{text[:1500]}\"\"\"
+
+Recipient role: {lead_role or "unknown"}
+
+Return ONE label, exactly as written, no other words:
+- HOT_BOOK_CALL  — explicitly wants a meeting / call / demo / "send a calendar link" / "what time works"
+- WARM_INTERESTED — positive signal but no concrete ask yet ("tell me more", "sounds interesting")
+- QUESTION — asking for pricing, details, brochure, references, or clarification
+- OBJECTION_PRICE — concerned about cost / budget / "we can't afford"
+- OBJECTION_TIMING — not now / try later / "circle back next quarter" / busy season
+- REFERRAL — forwarding to a colleague / "you should talk to X" / "contact Jane instead"
+- OUT_OF_OFFICE — automatic out-of-office or vacation auto-reply
+- NEGATIVE — wants to stop / unsubscribe / "remove me" / "not interested" (any polite phrasing counts)
+- UNCLEAR — none of the above
+"""
+        try:
+            response = self.generator.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=10,
+            )
+            label = (response.choices[0].message.content or "").strip().upper()
+            label = re.sub(r"[^A-Z_]", "", label.split()[0]) if label else ""
+            return label if label in self.INTENT_LABELS else "UNCLEAR"
+        except Exception as e:
+            logger.error(f"Intent classification failed: {e}")
+            return "UNCLEAR"
+
+    def draft_reply_response(
+        self,
+        intent: str,
+        reply_text: str,
+        original_outbound: str,
+        lead_context: dict,
+        sender_identity: dict,
+    ) -> str:
+        """Draft a tailored response to a positive/question reply. Returns
+        a string the user can paste into Mailreef. Never auto-sends."""
+        if intent not in self.DRAFT_INTENTS:
+            return ""
+
+        first_name = (lead_context.get("first_name") or "").strip()
+        role = (lead_context.get("role") or "").strip()
+        school = (lead_context.get("school_name") or lead_context.get("company_name") or "").strip()
+        sender_name = (sender_identity or {}).get("name") or "Andrew"
+        sender_title = (sender_identity or {}).get("title") or "Ivybound Education Partners"
+
+        intent_brief = {
+            "HOT_BOOK_CALL": (
+                "They want to schedule. Confirm a 15-min call this week or next, propose 2 specific time "
+                "windows in their likely time zone (e.g. Tue 10:30 AM ET or Thu 2:00 PM ET), and offer a "
+                "calendar link if they prefer. Keep it short."
+            ),
+            "WARM_INTERESTED": (
+                "They're warm. Offer the lightest next step that still creates momentum — a 10-min intro call OR "
+                "a 1-page overview, their pick. Don't oversell. Ask one qualifying question relevant to their role."
+            ),
+            "QUESTION": (
+                "Answer their specific question(s) directly using ONLY facts from the original outbound below. "
+                "If they asked for pricing, give the package(s) at face value. End by inviting a 15-min call or "
+                "asking a clarifying question."
+            ),
+            "OBJECTION_PRICE": (
+                "Acknowledge the budget concern, then briefly reframe value (ROI, the score guarantee or "
+                "money-back terms from the offer), and offer a low-risk next step (intro call, no commitment)."
+            ),
+            "OBJECTION_TIMING": (
+                "Acknowledge the timing, suggest a specific reconnect window (e.g. 'I'll circle back in 6 weeks'), "
+                "and ask if there's any prep info you can send now so they're ready to evaluate then."
+            ),
+        }[intent]
+
+        system = (
+            f"You are {sender_name} from {sender_title}. You are responding to a real reply to your "
+            "cold outreach. Voice: confident, peer-to-peer, never corporate. Short sentences. "
+            "Tight paragraphs. NO greeting line, NO sign-off, NO placeholder brackets — output ONLY the "
+            "body text. Do NOT invent statistics, dates, names, or details. Use ONLY the facts in the "
+            "original outbound and the recipient's reply. If you can't personalize without inventing, "
+            "stay generic but professional. 70-130 words."
+        )
+        user = f"""Intent: {intent}
+Guidance: {intent_brief}
+
+Recipient: {first_name or "(no first name)"}, role: {role or "(unknown)"}, organization: {school or "(unknown)"}.
+
+YOUR ORIGINAL OUTBOUND (facts you may reference):
+\"\"\"{(original_outbound or "")[:1800]}\"\"\"
+
+THEIR REPLY (respond to this directly):
+\"\"\"{(reply_text or "")[:1500]}\"\"\"
+
+Write the body of your response. No greeting, no sign-off."""
+        try:
+            response = self.generator.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+                temperature=0.4,
+                max_tokens=400,
+            )
+            draft = (response.choices[0].message.content or "").strip()
+            # Wrap with greeting + sign-off so the user can paste verbatim.
+            greeting = f"Hi {first_name}," if first_name else "Hi,"
+            sign_off = f"\n\nBest,\n{sender_name}\n{sender_title}"
+            return f"{greeting}\n\n{draft}{sign_off}"
+        except Exception as e:
+            logger.error(f"Draft generation failed: {e}")
+            return ""
+
     def analyze_sentiment(self, text: str) -> str:
         """Analyze reply sentiment. Explicitly catches opt-out language as negative."""
 
@@ -478,12 +612,52 @@ Return ONLY one word: positive, negative, or neutral."""
             
             logger.info(f"📩 Processing reply from {from_email}...")
             
-            # 2. Sentiment Analysis
+            # 2. Sentiment + Intent
             sentiment = self.analyze_sentiment(body)
             logger.info(f"Sentiment for {from_email}: {sentiment}")
 
+            # Lead lookup for intent context + draft personalization
+            lead_record = {}
+            original_outbound = ""
+            try:
+                self.sheets_client._fetch_all_records()
+                lead_record = self.sheets_client._cache.get(from_email.lower(), {}) or {}
+                if not lead_record and "@" in from_email:
+                    domain = from_email.split("@", 1)[1].lower()
+                    if domain not in {"gmail.com", "yahoo.com", "outlook.com", "hotmail.com"}:
+                        for rec in self.sheets_client._cache.values():
+                            if "@" in str(rec.get("email", "")) and rec["email"].split("@", 1)[1].lower() == domain:
+                                lead_record = rec
+                                break
+                original_outbound = lead_record.get("email_1_content", "") or ""
+            except Exception as e:
+                logger.warning(f"Could not look up lead context for {from_email}: {e}")
+
+            intent = self.classify_intent(body, lead_record.get("role", ""))
+            logger.info(f"Intent for {from_email}: {intent}")
+
+            # AI-drafted response for actionable intents
+            suggested_reply = ""
+            if intent in self.DRAFT_INTENTS:
+                # Pick the active sender identity for this profile
+                sender_identity = {}
+                try:
+                    profile_cfg = automation_config.CAMPAIGN_PROFILES.get(self.profile_name, {})
+                    override_name = profile_cfg.get("sender_identities_override")
+                    identities = getattr(automation_config, override_name, None) if override_name else None
+                    identities = identities or getattr(automation_config, "SENDER_IDENTITIES", {})
+                    sender_identity = identities.get("default") or next(iter(identities.values()), {})
+                except Exception:
+                    pass
+                suggested_reply = self.draft_reply_response(
+                    intent, body, original_outbound, lead_record, sender_identity
+                )
+                if suggested_reply:
+                    logger.info(f"📝 [DRAFT] Generated suggested reply for {from_email} (intent={intent})")
+
             # 2b. OPT-OUT ENFORCEMENT: Suppress negative replies immediately
-            if sentiment == 'negative':
+            #     Trigger on either coarse sentiment OR fine-grained intent.
+            if sentiment == 'negative' or intent in self.NEGATIVE_INTENTS:
                 try:
                     from suppression_manager import SuppressionManager
                     sm = SuppressionManager()
@@ -507,8 +681,16 @@ Return ONLY one word: positive, negative, or neutral."""
                 'subject': subject,
                 'entire_thread': body,
                 'sentiment': sentiment,
+                'intent': intent,
+                'suggested_reply': suggested_reply,
                 'original_sender': reply.get('inbox_email'),
-                'thread_id': reply.get('thread_id', reply.get('conversation_id'))
+                'thread_id': reply.get('thread_id', reply.get('conversation_id')),
+                'school_name': lead_record.get('school_name', ''),
+                'role': lead_record.get('role', ''),
+                'from_name': (
+                    f"{lead_record.get('first_name', '')} {lead_record.get('last_name', '')}".strip()
+                    or reply.get('from_name', '')
+                ),
             }
             try:
                 self.sheets_client.log_reply(reply_data)
