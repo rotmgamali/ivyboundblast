@@ -1,0 +1,9 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+We host corporate retreats, executive offsites, and team events at a private villa complex in the Bahamas — built specifically for groups that want privacy, focus, and a setting that doesn't feel like every other conference hotel.
+
+The property accommodates up to 22 guests across four villas, and we work with each company on a custom proposal rather than generic packages.
+
+Would it be useful to share a few details for {{ company_name }}'s next event?

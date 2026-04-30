@@ -1,0 +1,14 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+The reason I keep pushing on this is that summer is when the gap opens up — students who do nothing lose ground, and students who do even a little pull ahead going into the fall.
+
+What we offer {{ school_name }} families:
+- Essentials Package at $375 — 18-20 hours live instruction, 50+ practice tests, 4+ mock exams
+- 150+ point average SAT increase across 10,000+ students
+- $125,000+ average merit awards won, 100+ point score guarantee (50% refund if not met)
+
+You can see the full program here: https://ibforschools.info/
+
+Would 15 minutes next week work to walk through how other principals have shared this with their families?

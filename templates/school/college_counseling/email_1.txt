@@ -1,10 +1,9 @@
-Subject: Scholarship ROI for {{ school_name }} families
+Subject: {{ subject }}
 
-Following up on my previous note to {{ school_name }}. Most of the College Counselors we partner with are currently focused on maximizing college financial aid opportunities for their families.
+{{ personalized_opening }}
 
-We’ve found that our $375 intensive test prep program is often the deciding factor in students qualifying for merit-based scholarships—averaging over $15,000 in aid per student. 
+I know your plate is full with college applications, recommendation letters, and family meetings — so I'll keep this brief. We help counseling offices give their juniors and seniors a real edge on merit scholarships through affordable SAT/ACT prep.
 
-For your families, this represents a significant value-add that costs the school nothing to implement. Is this something you'd be open to discussing for 10 minutes? I'd love to share the case study from comparable schools.
+At $375 for 20 hours of live instruction, it removes the cost barrier that keeps many families from quality test prep. Our students average 150+ point SAT improvements, which has translated to over $15,000 in merit aid per student.
 
-Best regards,
-Mark Greenstein
+There's zero cost and zero admin work for {{ school_name }}. Would a quick 10-minute call make sense to see if this is worth sharing with your families?

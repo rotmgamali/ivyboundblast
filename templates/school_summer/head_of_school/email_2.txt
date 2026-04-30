@@ -1,0 +1,14 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+Quick context on why this tends to resonate with Heads of School: families often credit the school for any summer program the school recommends, even when it's run externally. It becomes part of your differentiation story without costing you anything.
+
+A few numbers from our 25 years working with families:
+- 10,000+ students served, 150+ point average SAT increase
+- $125,000+ average merit scholarship awards won by our students
+- Essentials Package at $375 (vs. $850+ market rate) with a 100+ point score guarantee
+
+Full overview here: https://ibforschools.info/
+
+Would you have 15 minutes next week to see if it's a fit for {{ school_name }} families this summer?

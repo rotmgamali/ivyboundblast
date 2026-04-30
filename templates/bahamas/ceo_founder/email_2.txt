@@ -1,0 +1,15 @@
+Subject: A private property buyout for {{ company_name }}
+
+Hi {{ first_name }},
+
+Following up on my earlier note. The full-property buyout at SerenitySpaces is what most founder-led teams end up choosing — four villas plus two additional rooms, sleeps up to 22, and the entire complex is yours for the duration of the retreat.
+
+A few details worth knowing: we're 35 minutes by air from Fort Lauderdale, 5 minutes on foot from Coral Beach, and pricing runs $150–$650 per night depending on the villa. The Agave villa (king bed, rainfall shower, pool access) is a popular pick for principals; the Lime villa anchors the group with a full chef's kitchen and dining for 10.
+
+Unlike a hotel block, you control the property — no other guests, no shared lobby, no compromises on privacy. Custom corporate proposals only, not automated booking.
+
+Reply if you'd like a tailored proposal for {{ company_name }}, or take a look at firmconnectus.net.
+
+Best,
+Andrew
+SerenitySpaces Bahamas

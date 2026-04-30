@@ -1,0 +1,14 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+A few specifics in case it's useful as you think about whether to pass this along internally:
+
+- Essentials Package at $375 (18-20 hours live instruction, 50+ practice tests, 4+ mock exams)
+- 150+ point average SAT increase across 10,000+ students over 25 years
+- $125,000+ average merit scholarship awards earned
+- 100+ point score guarantee, 50% refund if not met
+
+Full overview for schools here: https://ibforschools.info/
+
+Would you have 15 minutes next week for a quick call to see if there's a fit for {{ school_name }} families this summer?

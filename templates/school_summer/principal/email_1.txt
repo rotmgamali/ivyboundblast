@@ -1,0 +1,9 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+As {{ school_name }} heads into summer, I imagine you're already fielding the usual parent questions about how to keep kids engaged academically over break. I wanted to offer a simple resource you could pass along — no admin work on your end.
+
+We run summer SAT/ACT prep and general academic enrichment (including AP review and tutoring for younger grades) at private-school-friendly pricing. Schools just include us in a newsletter or hand out a flyer; families sign up with us directly.
+
+Would it help if I sent over something you could forward to parents before the school year wraps?

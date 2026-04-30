@@ -12,7 +12,7 @@ NC_BASE_URL = "https://api.namecheap.com/xml.response"
 
 DOMAINS = [
     "aspireteam.help", "aspireteam.space", "aspireteam.work",
-    "aspireteamus.help", "aspireteamus.space", "aspireteamus.study",
+    "aspireteamus.help", "aspireteamus.study",
     "aspireteamus.wiki", "aspireteamus.work", "aspireus.help",
     "aspireus.space", "aspireus.study", "aspireus.wiki", "aspireus.work",
     "aspiring.help", "aspiring.wiki", "aspiring.work", "aspiringus.help",
@@ -56,7 +56,7 @@ def update_dmarc(sld, tld):
             
             # If it's the DMARC record, update it
             if h_name == "_dmarc":
-                h_addr = "v=DMARC1; p=none; rua=mailto:spam@errorskin.com;"
+                h_addr = "v=DMARC1; p=reject; rua=mailto:spam@truckice.com; ruf=mailto:spam@truckice.com; sp=reject; fo=0:1:d:s; adkim=s; aspf=s"
                 dmarc_found = True
             
             new_hosts.append({
@@ -71,7 +71,7 @@ def update_dmarc(sld, tld):
             new_hosts.append({
                 "HostName": "_dmarc",
                 "RecordType": "TXT",
-                "Address": "v=DMARC1; p=none; rua=mailto:spam@errorskin.com;",
+                "Address": "v=DMARC1; p=reject; rua=mailto:spam@truckice.com; ruf=mailto:spam@truckice.com; sp=reject; fo=0:1:d:s; adkim=s; aspf=s",
                 "TTL": "1799"
             })
             
@@ -94,7 +94,7 @@ def update_dmarc(sld, tld):
             
         set_resp = requests.post(NC_BASE_URL, data=set_params)
         if "IsSuccess=\"true\"" in set_resp.text:
-            print(f"  ✅ Successfully updated DMARC to p=none for {sld}.{tld}")
+            print(f"  ✅ Successfully updated DMARC for {sld}.{tld}")
         else:
             print(f"  ❌ Failed to update {sld}.{tld}")
             print(f"  Raw response snippet: {set_resp.text[:200]}...")

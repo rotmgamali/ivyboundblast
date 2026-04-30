@@ -1,0 +1,9 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+Most strategic offsites end up in a hotel conference room that nobody remembers a week later. We run something different — a private villa complex in the Bahamas built specifically for executive teams who want their planning sessions to actually stick.
+
+It's the kind of setting where your leadership team is fully unplugged from the office, but you're still close enough to Florida to fly home the same afternoon if needed.
+
+Would it be worth a short conversation about what your next offsite could look like?

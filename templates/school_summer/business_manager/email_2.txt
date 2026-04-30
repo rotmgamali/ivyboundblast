@@ -1,0 +1,14 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+The financial picture for parents, which I think is the angle that matters most here:
+
+- Our Essentials Package is $375 vs. the $850+ they'd pay at a typical prep center
+- 150+ point average SAT increase, $125,000+ average merit awards earned
+- 100+ point score guarantee with a 50% refund if not met
+- 25 years, 10,000+ students — established track record, no risk to the school
+
+Overview here: https://ibforschools.info/
+
+Would 15 minutes next week work to walk through how this fits into {{ school_name }}'s family value proposition?

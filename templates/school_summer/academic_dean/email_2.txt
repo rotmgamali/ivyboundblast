@@ -1,0 +1,14 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+A bit more on the academic side of what we do, since I know that's what matters most for your role:
+
+- 25 years of curriculum development; 10,000+ students through the program
+- 150+ point average SAT increase, with a 100+ point guarantee (50% refund if not met)
+- Essentials Package at $375: 18-20 hours live instruction, 50+ practice tests, 4+ mock exams
+- $125,000+ average merit scholarship awards earned by our students
+
+Full curriculum and structure here: https://ibforschools.info/
+
+Would you have 15 minutes next week to discuss how this could plug into {{ school_name }}'s summer continuity plan?

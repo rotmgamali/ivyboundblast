@@ -1,0 +1,9 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+You know better than I do that the summer before junior and senior year is where the SAT/ACT score gets made — and where merit aid is either won or left on the table. I wanted to put a resource in front of you that you can pass along to {{ school_name }} families heading into break.
+
+We run a structured summer prep program built specifically around the junior summer window. Zero cost or work for your office — families enroll with us directly, you just point them our way.
+
+Would a quick one-pager be useful for you to share with rising juniors and their parents?

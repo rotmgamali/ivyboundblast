@@ -92,7 +92,7 @@ class EmailGenerator:
         - If 'school' or 'b2b', use the Archetype + Scraper logic.
         - Otherwise, use legacy dictionary prompts.
         """
-        if campaign_type in ["school", "b2b"]:
+        if campaign_type in ["school", "b2b", "crypto"]:
             return self._generate_templated_email(campaign_type, sequence_number, lead_data, enrichment_data, sender_email)
         else:
             return self._generate_legacy_email(campaign_type, sequence_number, lead_data, enrichment_data)
@@ -109,24 +109,27 @@ class EmailGenerator:
         url = lead_data.get("website") or lead_data.get("domain")
         
         # --- Institution Type Guard (Strict K-12 Filter) ---
-        EXCLUDED_KEYWORDS = [
-            'surf', 'flight', 'preschool', 'pre-school', 'university', 'college', 
-            'gym', 'dance', 'martial arts', 'childcare', 'daycare', 'early learning',
-            'nursery', 'ballet', 'yoga', 'tennis', 'soccer', 'swimming', 'driving school',
-            'learning center', 'academy of art', 'beauty academy', 'kindergarten'
-        ]
-        school_name = (lead_data.get("school_name") or "").lower()
-        role = (lead_data.get("role") or "").lower()
-        full_text = f"{school_name} {role}"
-        
-        if any(keyword in full_text for keyword in EXCLUDED_KEYWORDS):
-            self.logger.warning(f"🚫 [INSTITUTION GUARD] Skipping non-traditional lead: {full_text}")
-            return {
-                "subject": "SKIP_LEAD",
-                "body": "Validation Failed: Non-Traditional Institution (Not K-12 Middle/High School)"
-            }
+        # Skip this filter for crypto campaigns — only applies to school outreach
+        if campaign_type == "school":
+            EXCLUDED_KEYWORDS = [
+                'surf school', 'flight school', 'preschool', 'pre-school', 'university',
+                'gym ', 'dance studio', 'martial arts', 'childcare', 'daycare', 'early learning',
+                'nursery', 'ballet school', 'yoga studio', 'tennis academy', 'soccer academy',
+                'swimming school', 'driving school', 'learning center', 'academy of art',
+                'beauty academy', 'kindergarten only'
+            ]
+            # Only check school name, not role (avoid false positives like "College Counselor")
+            school_name = (lead_data.get("school_name") or "").lower()
+
+            if any(keyword in school_name for keyword in EXCLUDED_KEYWORDS):
+                self.logger.warning(f"🚫 [INSTITUTION GUARD] Skipping non-traditional lead: {full_text}")
+                return {
+                    "subject": "SKIP_LEAD",
+                    "body": "Validation Failed: Non-Traditional Institution (Not K-12 Middle/High School)"
+                }
 
         # --- 1. Identify Archetype ---
+        role = (lead_data.get("role") or "").lower()
         role_clean = role.strip()
         archetype = self._get_archetype(role_clean)
         _logger.debug(f"🎯 [GEN] {campaign_type.upper()} Archetype: {archetype} (detected from role: '{role_clean}')")
@@ -143,35 +146,25 @@ class EmailGenerator:
             _logger.error(f"❌ Template missing for {campaign_type}/{archetype}/{sequence_number} and fallback general failed.")
             return {"subject": "Quick question", "body": "I'd love to connect regarding your current operations."}
 
-        # --- 3. Scrape Website ---
+        # --- 3. Smart Website Scraping ---
+        school_research = enrichment_data.get("school_research", {})
         website_content = enrichment_data.get("website_content", "")
-        
-        if not website_content and url:
-            # SANITY CHECK: Ensure we aren't scraping Google Maps
+
+        if not school_research and not website_content and url:
             if "google.com" in url.lower() or "goo.gl" in url.lower():
                 self.logger.warning(f"⚠️ Skipping scrape for Google URL: {url}")
-                website_content = "Scraper skipped for Google URL."
+                school_research = {}
             else:
                 try:
                     if not url.startswith("http"):
                         url = "https://" + url
-                    
-                    # Try external scrapers first
-                    if campaign_type == "b2b" and b2b_scraper:
-                        website_content = b2b_scraper.scrape_b2b_text(url)
-                    elif school_scraper:
-                        website_content = school_scraper.scrape_website_text(url)
-                    else:
-                        # FALLBACK: Built-in robust scraper
-                        website_content = self._fallback_scrape(url)
-
-                    if website_content and len(website_content) > 100:
-                        self.logger.debug(f"✅ [SCRAPE SUCCESS] Found {len(website_content)} characters for personalization.")
-                    else:
-                        self.logger.warning(f"⚠️ [SCRAPE WEAK] Only found {len(website_content) if website_content else 0} chars.")
+                    school_research = self._smart_scrape(url)
+                    website_content = school_research.get("raw", "")
+                    non_empty = sum(1 for k, v in school_research.items() if v and k != "raw")
+                    self.logger.info(f"✅ [SMART SCRAPE] Extracted {non_empty} structured fields from {url}")
                 except Exception as e:
                     self.logger.error(f"❌ [SCRAPE ERROR] Failed for {url}: {e}")
-                    website_content = "No website content available."
+                    school_research = {}
 
         # --- 4. Domain Guard & Verification (DEACTIVATED) ---
         # if email and url:
@@ -213,7 +206,7 @@ class EmailGenerator:
 
         # Build Prompts (System + User)
         system_prompt, user_prompt, envelope = self._prepare_templated_prompts(
-            campaign_type, template_content, lead_data, website_content, sequence_number, sender_email, custom_context
+            campaign_type, template_content, lead_data, website_content, sequence_number, sender_email, custom_context, school_research
         )
         
         # Call LLM for Body & Subject
@@ -241,27 +234,114 @@ class EmailGenerator:
             "body": final_body
         }
 
-    def _fallback_scrape(self, url: str) -> str:
-        """Internal lightweight scraper for website text."""
+    def _smart_scrape(self, url: str) -> dict:
+        """Extract structured school data from website instead of raw text dump."""
         import requests
         from bs4 import BeautifulSoup
+        result = {"raw": "", "mission": "", "programs": "", "athletics": "", "achievements": "", "mascot": "", "enrollment": "", "faith": ""}
+
         try:
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
             response = requests.get(url, headers=headers, timeout=15, verify=False)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                # Remove script/style
-                for s in soup(["script", "style"]):
-                    s.decompose()
-                text = soup.get_text(separator=' ')
-                # Clean whitespace
-                lines = (line.strip() for line in text.splitlines())
-                chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-                text = ' '.join(chunk for chunk in chunks if chunk)
-                return text[:5000]
+            if response.status_code != 200:
+                return result
+
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # Remove noise elements
+            for tag in soup(["script", "style", "nav", "footer", "header", "iframe", "noscript"]):
+                tag.decompose()
+
+            text = soup.get_text(separator='\n')
+            lines = [line.strip() for line in text.splitlines() if line.strip() and len(line.strip()) > 10]
+            clean_text = '\n'.join(lines)
+            result["raw"] = clean_text[:3000]
+
+            text_lower = clean_text.lower()
+
+            # Extract mission statement
+            for keyword in ["our mission", "mission statement", "about us", "our story", "who we are", "our vision"]:
+                idx = text_lower.find(keyword)
+                if idx != -1:
+                    chunk = clean_text[idx:idx+500]
+                    sentences = chunk.split('.')[:3]
+                    result["mission"] = '.'.join(sentences).strip()[:400]
+                    break
+
+            # Extract academic programs
+            program_keywords = ["ap course", "ib program", "honors", "stem", "dual enrollment", "college prep",
+                                "advanced placement", "curriculum", "academic program", "magnet"]
+            program_hits = []
+            for kw in program_keywords:
+                idx = text_lower.find(kw)
+                if idx != -1:
+                    start = max(0, idx - 50)
+                    program_hits.append(clean_text[start:idx+200].strip())
+            if program_hits:
+                result["programs"] = ' | '.join(program_hits[:3])[:500]
+
+            # Extract athletics/mascot
+            for kw in ["athletics", "varsity", "sports program", "our teams", "go "]:
+                idx = text_lower.find(kw)
+                if idx != -1:
+                    result["athletics"] = clean_text[idx:idx+300].strip()[:300]
+                    break
+
+            # Mascot detection
+            import re as _re
+            mascot_match = _re.search(r'(?:go|home of the|we are the)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)', clean_text)
+            if mascot_match:
+                result["mascot"] = mascot_match.group(1).strip()
+
+            # Extract achievements
+            for kw in ["award", "recognition", "ranked", "named", "accreditation", "blue ribbon", "honor roll"]:
+                idx = text_lower.find(kw)
+                if idx != -1:
+                    result["achievements"] = clean_text[max(0,idx-30):idx+250].strip()[:300]
+                    break
+
+            # Extract enrollment/size
+            enrollment_match = _re.search(r'(\d{2,4})\s*(?:students|enrolled|families|boys and girls)', clean_text, _re.IGNORECASE)
+            if enrollment_match:
+                result["enrollment"] = enrollment_match.group(0).strip()
+
+            # Detect faith affiliation
+            faith_keywords = ["christian", "catholic", "lutheran", "jewish", "montessori", "baptist", "episcopal",
+                              "methodist", "adventist", "islamic", "faith-based", "church", "ministry"]
+            for fk in faith_keywords:
+                if fk in text_lower:
+                    result["faith"] = fk.title()
+                    break
+
+            # If homepage was thin, try /about page
+            if len(result["mission"]) < 50 and len(result["programs"]) < 50:
+                try:
+                    about_url = url.rstrip('/') + '/about'
+                    resp2 = requests.get(about_url, headers=headers, timeout=10, verify=False)
+                    if resp2.status_code == 200:
+                        soup2 = BeautifulSoup(resp2.text, 'html.parser')
+                        for tag in soup2(["script", "style", "nav", "footer", "header"]):
+                            tag.decompose()
+                        about_text = soup2.get_text(separator='\n')
+                        about_lower = about_text.lower()
+                        for keyword in ["our mission", "mission statement", "about us", "who we are"]:
+                            idx = about_lower.find(keyword)
+                            if idx != -1:
+                                chunk = about_text[idx:idx+500]
+                                sentences = chunk.split('.')[:3]
+                                result["mission"] = '.'.join(sentences).strip()[:400]
+                                break
+                except Exception:
+                    pass
+
         except Exception as e:
-            self.logger.error(f"Fallback scrape failed: {e}")
-        return ""
+            self.logger.error(f"Smart scrape failed for {url}: {e}")
+
+        return result
+
+    def _fallback_scrape(self, url: str) -> str:
+        """Legacy scraper — returns raw text. Use _smart_scrape instead."""
+        data = self._smart_scrape(url)
+        return data.get("raw", "")
 
     def _get_archetype(self, role: str) -> str:
         """Map job title to archetype folder name."""
@@ -389,9 +469,15 @@ Respond in JSON only:
         """Read template file from disk (e.g. templates/school/principal/email_1.txt)."""
         # Map sequence number to file name (email_1.txt)
         filename = f"email_{sequence_number}.txt"
+        # First try: templates_dir / campaign_type / archetype (for shared templates_dir like "templates")
         path = self.templates_dir / campaign_type / archetype / filename
-        
-        _logger.debug(f"🔍 [PATH CHECK] Looking for template at: {path}")
+        # Second try: templates_dir / archetype (if templates_dir already includes campaign_type, e.g. "templates/crypto")
+        path_short = self.templates_dir / archetype / filename
+
+        _logger.debug(f"🔍 [PATH CHECK] Looking for template at: {path} or {path_short}")
+
+        if not path.exists() and path_short.exists():
+            path = path_short
         
         if path.exists():
             content = path.read_text(encoding="utf-8")
@@ -410,7 +496,7 @@ Respond in JSON only:
             
         return None
 
-    def _prepare_templated_prompts(self, campaign_type: str, template_content: str, lead_data: dict, website_content: str, sequence_number: int, sender_email: str, custom_context: str = "") -> tuple:
+    def _prepare_templated_prompts(self, campaign_type: str, template_content: str, lead_data: dict, website_content: str, sequence_number: int, sender_email: str, custom_context: str = "", school_research: dict = None) -> tuple:
         """
         Constructs (system_message, user_message, envelope_dict).
         Implements the ENVELOPE PATTERN: 
@@ -437,38 +523,68 @@ Respond in JSON only:
         
         # Name & Greeting Logic
         raw_name = lead_data.get("first_name", "")
-        sanitized = self._sanitize_name(raw_name, lead_data)
         role = lead_data.get("role", "").strip()
         school_name = lead_data.get("school_name") or lead_data.get("company_name") or "your school"
-        
+
+        # For crypto campaigns, skip the school name sanitizer — channel names ARE valid names
+        if campaign_type == "crypto":
+            sanitized = raw_name.strip() if raw_name else ""
+        else:
+            sanitized = self._sanitize_name(raw_name, lead_data)
+
         if sanitized:
             first_name = sanitized
-            # Religious Titles
-            role_lower = role.lower()
-            religious_titles = {"pastor": "Pastor", "reverend": "Reverend", "rev.": "Reverend", "father": "Father", "rabbi": "Rabbi"}
-            for keyword, title in religious_titles.items():
-                if keyword in role_lower and title.lower() not in first_name.lower():
-                    first_name = f"{title} {first_name}"
-                    break
-            greeting_line = f"Hi {first_name},"
+            if campaign_type != "crypto":
+                # Religious Titles (school campaigns only)
+                role_lower = role.lower()
+                religious_titles = {"pastor": "Pastor", "reverend": "Reverend", "rev.": "Reverend", "father": "Father", "rabbi": "Rabbi"}
+                for keyword, title in religious_titles.items():
+                    if keyword in role_lower and title.lower() not in first_name.lower():
+                        first_name = f"{title} {first_name}"
+                        break
+            greeting_line = f"Hey {first_name}," if campaign_type == "crypto" else f"Hi {first_name},"
         elif role and len(role) > 2 and role.lower() not in ["high school", "middle school", "elementary school", "pk-12", "preschool", "academy"]:
             # Fallback to Role-based (e.g. Hi Principal,)
             first_name = role.title()
-            greeting_line = f"Hi {first_name},"
+            greeting_line = f"Hey {first_name}," if campaign_type == "crypto" else f"Hi {first_name},"
         elif school_name and school_name.lower() != "your school":
-            # Fallback to School-based Team
-            greeting_line = f"To the {school_name} Team,"
+            # Fallback to org name
+            greeting_line = f"Hey {school_name} team," if campaign_type == "crypto" else f"To the {school_name} Team,"
             first_name = "Team"
         else:
             # Absolute fallback
-            greeting_line = "Hi,"
-            first_name = "School Leader"
-            
-        # Sender Logic
-        sender_name = "Andrew"
-        if sender_email:
-            if "mark" in sender_email.lower(): sender_name = "Mark Greenstein"
-            elif "genelle" in sender_email.lower(): sender_name = "Genelle"
+            if campaign_type == "crypto":
+                greeting_line = "Hey,"
+                first_name = ""
+            else:
+                greeting_line = "Hi,"
+                first_name = "School Leader"
+
+        # Sender Identity (from config — supports per-campaign override)
+        sender_identities = None
+        sender_company = "Ivybound Education Partners"
+        try:
+            from mailreef_automation import automation_config as _ac
+            override_name = (self.profile_config or {}).get("sender_identities_override") if hasattr(self, "profile_config") and self.profile_config else None
+            if override_name and hasattr(_ac, override_name):
+                sender_identities = getattr(_ac, override_name)
+            else:
+                sender_identities = _ac.SENDER_IDENTITIES
+        except Exception:
+            sender_identities = {"default": {"name": "Andrew Rollins", "title": "Ivybound Education Partners"}}
+
+        if campaign_type == "crypto":
+            sender_name = "Andrew"
+        else:
+            sender_identity = sender_identities.get("default", {})
+            if sender_email:
+                local_part = sender_email.split("@")[0].lower() if "@" in sender_email else ""
+                for key in sender_identities:
+                    if key in local_part:
+                        sender_identity = sender_identities[key]
+                        break
+            sender_name = sender_identity.get("name", "Andrew Rollins")
+            sender_company = sender_identity.get("title", sender_company)
         
         
         # --- 2. Python-Side Template Substitution (The Fix) ---
@@ -529,8 +645,9 @@ Respond in JSON only:
                   clean_draft = parts[0].strip()
         
         # --- 4. Envelope Definition ---
-        # Define the deterministic shell
-        sign_off_block = f"Best,\n{sender_name}"
+        # Define the deterministic shell. Include company line so brand is correct
+        # for non-Ivybound campaigns (e.g. SerenitySpaces Bahamas).
+        sign_off_block = f"Best,\n{sender_name}\n{sender_company}"
         envelope = {
             "greeting": greeting_line,
             "sign_off": sign_off_block,
@@ -538,74 +655,185 @@ Respond in JSON only:
         }
         
         # --- 5. System Prompt (Constraint) ---
-        system_prompt = f"""You are {sender_name}, a helpful education consultant.
-        
-STYLE GUIDE:
-- Tone: Human, warm, brief, and professional. NO CORPORATE JARGON.
-- Formatting: Use paragraphs only. Spaced out.
-- Absolute Rules:
-  1. DO NOT include a greeting (e.g. "Hi...").
-  2. DO NOT include a sign-off (e.g. "Best, Mark").
-  3. OUTPUT ONLY the Subject and the Body paragraphs.
+        if campaign_type == "crypto":
+            system_prompt = f"""You are {sender_name}, founder of Demons & Deities, a TFT-style auto-battler NFT game on Polygon.
 
-- IF PUBLIC: Focus on district alignment, budget efficiency, and test scores.
-- IF PRIVATE: Focus on enrollment, prestige, and college matriculation.
+STYLE GUIDE:
+- Tone: Casual, confident, like texting someone you respect but don't know yet. NOT corporate.
+- Write like a real person — short sentences, no buzzwords, no "I'd love to" or "I noticed that" or "caught my eye".
+- Formatting: Short paragraphs. Max 4-5 lines of body text total.
+- Absolute Rules:
+  1. DO NOT include a greeting (e.g. "Hey...").
+  2. DO NOT include a sign-off (e.g. "Best, Andrew").
+  3. OUTPUT ONLY the Subject and the Body text.
+  4. NEVER say "I noticed", "caught my eye", "I was impressed", "I'd love to connect".
 
 PLACEHOLDER POLICY:
 - NEVER use brackets or parentheses for unknown data.
-- If unsure, OMIT or use a natural, generic phrase.
+- If the research doesn't reveal anything specific, just skip personalization and go straight to the pitch.
+"""
+        else:
+            # Per-campaign system_prompt_template override (e.g. Bahamas retreat)
+            profile_prompt = (self.profile_config or {}).get("system_prompt_template") if hasattr(self, "profile_config") and self.profile_config else None
+            if profile_prompt:
+                try:
+                    system_prompt = profile_prompt.format(sender_name=sender_name, sender_company=sender_company)
+                except Exception:
+                    system_prompt = profile_prompt
+                # Skip default school prompt — return early through the existing flow
+                # (we still need user_prompt below; jump past the default block)
+                school_type = lead_data.get("school_type", "private").lower()
+                _profile_prompt_used = True
+            else:
+                _profile_prompt_used = False
+
+            if not _profile_prompt_used:
+                school_type = lead_data.get("school_type", "private").lower()
+                system_prompt = f"""You are {sender_name} from Ivybound Education Partners, writing a personal outreach email to a school administrator.
+
+VOICE:
+- Write in first person, conversational but professional. Like a real person, not a marketer.
+- Short paragraphs. No bullet points in Email 1.
+- NEVER use these phrases: "I noticed", "caught my eye", "I'd love to", "reaching out", "touching base", "checking in", "hope this finds you well", "game-changer", "unlock potential", "leverage", "synergy".
+- Sound like someone who genuinely read about their school — not someone running a mail merge.
+
+RULES:
+1. Do NOT include any greeting (no "Hi Name," or "Good morning,").
+2. Do NOT include any sign-off (no "Best," or signature).
+3. Output ONLY the Subject line and Body paragraphs.
+4. NEVER use placeholder brackets [] or parenthetical placeholders ().
+5. If you cannot find a specific detail to reference from the research, write a clean professional email without faking personalization. A genuine pitch is better than fake flattery.
+
+SCHOOL CONTEXT:
+- School type: {school_type}
+- If PRIVATE: Emphasize enrollment differentiation, prestige, college matriculation, parent value.
+- If PUBLIC: Emphasize district alignment, budget efficiency, measurable test score gains.
 """
 
         # --- 6. User Prompt (Body & Subject Generation) ---
-        user_prompt = f"""You are a local parent/neighbor writing a 1-to-1 email to {first_name} at "{school_name}".
+        if not school_research:
+            school_research = {}
 
-RESEARCH HIGHLIGHTS (Live Web Scrape):
+        if campaign_type == "crypto":
+            user_prompt = f"""You are writing a cold email to {first_name} ({role}) at "{school_name}".
+
+RESEARCH ON THEM (scraped from their website/channel):
 {website_content[:4500]}
 
-DRAFT CONTENT:
+DRAFT EMAIL (your starting point):
 '''
 {clean_draft}
 '''
 
-LEAD CONTEXT:
+EXTRA CONTEXT:
 {custom_context}
 
 TASK:
-    1. SUBJECT LINE: Write a 2-4 word "Insider" subject line based on the RESEARCH.
-       - EXAMPLES: "Go [Mascot]!", "[Program Name] question", "Question for [School Name] families".
-       - DO NOT use generic terms like "Checking in" or "Scholarship".
+    1. SUBJECT LINE: Use "this game shouldn't exist yet" as the subject. Do NOT change it unless the research reveals something so specific that a personalized subject would clearly outperform (e.g. referencing their exact channel name or a project they covered). In that case, keep it under 6 words and mysterious.
 
-    2. BODY: Take the provided DRAFT CONTENT and INCREASE the personalization by blending in a specific detail from the RESEARCH.
-       - IMPORTANT: You MUST keep the core messaging about the $375 program, the $15,000 in aid, and the the offer of a 10-minute chat. 
-       - DO NOT shorten the email significantly. The length of the draft is intentional.
-       - Blend the personalized observation into the first or second paragraph naturally.
-    
-    3. CONSTRAINTS:
-       - NO GREETINGS or SIGN-OFFS.
-       - NO PLACEHOLDERS.
-       - Keep the word count between 100-150 words to maintain the professional case-study tone.
+    2. FIRST LINE: Write ONE hyper-personalized opening line based on the RESEARCH. Find something SPECIFIC:
+       - A video they made, a project they backed, a tweet topic, a client they worked with
+       - Write it casually like a text: "your [specific thing] was sick" or "you backed [project] before anyone else"
+       - If research is empty or generic, skip personalization entirely — just start with the pitch
+
+    3. REST OF BODY: Keep the core pitch from the DRAFT but make it sound like a human texting. Max 4 lines after the personalized opener. Include the trailer link and the "Want a Founders Pass?" hook.
+
+    4. CONSTRAINTS:
+       - NO GREETINGS or SIGN-OFFS
+       - NO PLACEHOLDERS like [name] or (company)
+       - Total body: 40-60 words MAX. Shorter is better.
+       - BANNED PHRASES (never use these): "on point", "impressive", "caught my eye", "I noticed", "I'd love to", "reaching out", "touching base", "always on point", "next level", "incredible", "amazing work"
+       - If the RESEARCH section is empty, very short, or just generic website boilerplate (navigation text, cookie notices, footer links) — DO NOT write a personalized first line at all. Just go straight to the pitch. A cold pitch with no personalization is better than fake personalization.
+       - CRITICAL: You MUST always include the full pitch (what the game is, the trailer link, and the CTA). Never output just a trailer link with no context. The DRAFT CONTENT contains the minimum — do not remove lines from it, only rephrase them.
 
     Output format:
-    SUBJECT: [Insider Subject]
+    SUBJECT: [subject line]
 
-    BODY: [Personalized Paragraph 1]
+    BODY: [personalized first line]
 
-    [Paragraph 2]
+    [2-3 lines of pitch]
 
-    [Paragraph 3]
-"""
+    [one-line hook/CTA]"""
+        else:
+            # Build structured research section from smart scraper
+            research_lines = []
+            if school_research.get("mission"):
+                research_lines.append(f"- Mission: {school_research['mission']}")
+            if school_research.get("programs"):
+                research_lines.append(f"- Programs: {school_research['programs']}")
+            if school_research.get("athletics"):
+                research_lines.append(f"- Athletics: {school_research['athletics']}")
+            if school_research.get("mascot"):
+                research_lines.append(f"- Mascot: {school_research['mascot']}")
+            if school_research.get("achievements"):
+                research_lines.append(f"- Achievements: {school_research['achievements']}")
+            if school_research.get("enrollment"):
+                research_lines.append(f"- Size: {school_research['enrollment']}")
+            if school_research.get("faith"):
+                research_lines.append(f"- Affiliation: {school_research['faith']}")
+
+            research_section = '\n'.join(research_lines) if research_lines else "No specific research available — write a clean professional email without faking personalization."
+
+            city = lead_data.get("city", "")
+            state = lead_data.get("state", "")
+            location = f"{city}, {state}".strip(", ") if city or state else ""
+
+            user_prompt = f"""You are writing to {first_name} ({lead_data.get('role', 'administrator')}) at "{school_name}"{f' in {location}' if location else ''}.
+
+SCHOOL RESEARCH (extracted from their website):
+{research_section}
+
+{f'RAW WEBSITE TEXT (backup context):' + chr(10) + website_content[:2000] if not research_lines and website_content else ''}
+
+DRAFT EMAIL TEMPLATE (your starting framework — keep the core pitch intact):
+'''
+{clean_draft}
+'''
+
+{f'ADDITIONAL CONTEXT:' + chr(10) + custom_context if custom_context else ''}
+
+TASK:
+1. SUBJECT LINE: Write a 3-6 word subject that feels specific to this school. Examples:
+   - "Quick question for {school_name} families"
+   - "Go {school_research.get('mascot', 'Eagles')}! + a question"
+   - "Question about {school_name}"
+   Do NOT use generic phrases like "Scholarship ROI" or "Checking in".
+
+2. PERSONALIZED OPENING (1-2 sentences): Reference ONE specific detail from the research — a program, achievement, mission phrase, athletic team, or faith community. Make it genuine. If research is thin, write a clean professional opener without faking specifics.
+
+3. CORE PITCH: Keep the template's key facts:
+   - $375 program price
+   - 150+ point average SAT increase
+   - $15,000+ in merit aid per student
+   - Zero cost to the school
+   - 10-minute call CTA
+
+4. CONSTRAINTS:
+   - No greetings or sign-offs.
+   - No placeholder brackets or parentheses.
+   - Total body: 100-140 words.
+   - The personalized opening must flow naturally into the pitch.
+
+Output format:
+SUBJECT: [subject line]
+
+BODY: [full body text]"""
         return system_prompt, user_prompt, envelope
 
     def _strip_hallucinations(self, body_text: str, greeting: str, sign_off: str) -> str:
         """Failsafe: If AI wrote 'Hi Andrew,' or 'Best, Name' anyway, remove it."""
         lines = body_text.split("\n")
         
-        # 1. Strip Leading Greeting (be very thorough)
-        greeting_markers = ["hi", "dear", "good morning", "good afternoon", "good evening", "hello", "to the", "attention"]
-        if lines and any(g.lower() in lines[0].lower() for g in greeting_markers):
-            # Check if it looks like a greeting (short, ends in comma/colon)
+        # 1. Strip Leading Greeting — only if first line is SHORT and looks like a greeting
+        greeting_markers = ["hi ", "hi,", "dear ", "good morning", "good afternoon", "good evening", "hello ", "hello,", "to the "]
+        if lines:
             first_line = lines[0].strip()
-            if "," in first_line or ":" in first_line or len(first_line) < 40:
+            is_greeting = (
+                len(first_line) < 50
+                and any(first_line.lower().startswith(g) for g in greeting_markers)
+                and ("," in first_line or ":" in first_line)
+            )
+            if is_greeting:
                 lines = lines[1:]
                 
         # 2. Strip Trailing Sign-off
@@ -626,15 +854,12 @@ TASK:
 
         body = "\n".join(lines).strip()
         
-        # 3. Strip Bracketed/Parenthetical Hallucinations (e.g. [City], (Name))
-        # This regex catches: [Text], (text), (Text), [City], etc.
-        # It replaces them with a generic community/organization reference if possible, 
-        # or just removes them.
-        body = re.sub(r'\[[^\]]+\]', 'your community', body)
-        body = re.sub(r'\([^\)]+\)', 'your community', body)
-        
-        # Cleanup double spaces or weird punctuation left behind
-        body = body.replace('your community your community', 'your community')
+        # 3. Strip ONLY placeholder brackets/parens — preserve legitimate content
+        # Only remove brackets containing placeholder-like text (single words, "Insert X", "Your X")
+        body = re.sub(r'\[(?:Name|City|School|Company|Insert|Your|Specific|Detail|School Name|First Name|Mascot)[^\]]*\]', '', body)
+        # Only remove parens that look like placeholders, not legitimate content like "(150+ points)"
+        body = re.sub(r'\((?:Name|City|School|Company|Insert|Your|Specific|Detail)[^\)]*\)', '', body)
+
         body = body.replace('  ', ' ').strip()
         
         return body
@@ -674,9 +899,9 @@ TASK:
             messages.append({"role": "user", "content": prompt})
 
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o",
                 messages=messages,
-                temperature=0.7
+                temperature=0.4
             )
             return self._parse_response(response.choices[0].message.content)
         except Exception as e:

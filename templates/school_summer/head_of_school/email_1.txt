@@ -1,0 +1,9 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+With summer break around the corner, a lot of {{ school_name }} families will be looking for meaningful ways to keep their kids sharp — and I wanted to offer something you can pass along at zero cost and zero lift to your team.
+
+We run an affordable summer enrichment program (SAT/ACT prep, AP review, executive function coaching) that's tailored for private school families. Schools we work with simply mention us in a parent newsletter or hand out a flyer — families enroll directly with us.
+
+Would it be useful if I sent over a one-pager you could share before summer kicks off?

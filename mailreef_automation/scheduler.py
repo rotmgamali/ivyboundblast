@@ -5,6 +5,7 @@ Uses APScheduler for cron-like functionality
 
 import random
 import logging
+import time
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -42,13 +43,17 @@ class EmailScheduler:
             log_file=log_file,
             archetypes=self.profile_config.get("archetypes")
         )
+        # Expose profile config so generator can pick up sender_identities_override
+        # and system_prompt_template from per-campaign config.
+        self.generator.profile_config = self.profile_config
         
         # Cloud-Native: Sheets Integration
         profile_config = config.CAMPAIGN_PROFILES[campaign_profile]
         from sheets_integration import GoogleSheetsClient
         self.sheets = GoogleSheetsClient(
             input_sheet_name=profile_config["input_sheet"],
-            replies_sheet_name=profile_config["replies_sheet"]
+            replies_sheet_name=profile_config["replies_sheet"],
+            input_worksheet_name=profile_config.get("input_worksheet"),
         )
         self.sheets.setup_sheets()
         
@@ -71,6 +76,10 @@ class EmailScheduler:
         
         self.suppression = SuppressionManager()
         self.is_running = False
+
+        # Daily send cap tracking (inbox_id_YYYYMMDD -> count)
+        self._daily_send_counts = {}
+        self._daily_cap = getattr(config, 'MAX_DAILY_SENDS_PER_INBOX', 20)
         
     def calculate_daily_send_requirements(self, day_type):
         """Calculate how many emails each inbox should send today"""
@@ -417,7 +426,16 @@ class EmailScheduler:
                     continue
 
                 body_html = body_text.replace('\n', '<br>')
-                
+
+                # --- CAN-SPAM COMPLIANCE FOOTER ---
+                physical_address = getattr(self.config, 'PHYSICAL_ADDRESS', '')
+                unsub_mailto = getattr(self.config, 'UNSUBSCRIBE_MAILTO', '')
+                if physical_address and unsub_mailto:
+                    compliance_text = f"\n\n---\n{physical_address}\nPrefer not to hear from us? Reply \"unsubscribe\" or email {unsub_mailto}"
+                    compliance_html = f'<br><br><hr style="border:none;border-top:1px solid #ddd;margin:20px 0"><p style="font-size:11px;color:#999;line-height:1.4">{physical_address}<br>Prefer not to hear from us? Reply &quot;unsubscribe&quot; or email <a href="mailto:{unsub_mailto}" style="color:#999">{unsub_mailto}</a></p>'
+                    body_text += compliance_text
+                    body_html += compliance_html
+
                 # 2. Iterate over every gathered email
                 sent_count = 0
                 for target_email in target_emails:
@@ -448,6 +466,10 @@ class EmailScheduler:
                     
                     self.logger.info(f"✅ [SEND SUCCESS] Email sent to {target_email} via inbox {inbox_id}. MsgID: {response.get('message_id')}")
                     sent_count += 1
+
+                    # Track daily send count for cap enforcement
+                    today_key = f"{inbox_id}_{datetime.now(pytz.timezone('US/Eastern')).strftime('%Y%m%d')}"
+                    self._daily_send_counts[today_key] = self._daily_send_counts.get(today_key, 0) + 1
                     
                     results.append({
                         "email": target_email,
@@ -535,6 +557,15 @@ class EmailScheduler:
     
     def _execute_slot(self, inbox_id, scheduled_time):
         """Execute a single send slot with sequence prioritization"""
+        # --- DAILY CAP ENFORCEMENT ---
+        today_key = f"{inbox_id}_{datetime.now(pytz.timezone('US/Eastern')).strftime('%Y%m%d')}"
+        current_count = self._daily_send_counts.get(today_key, 0)
+        if current_count >= self._daily_cap:
+            return  # Silently skip — daily cap reached for this inbox
+
+        # --- ANTI-PATTERN JITTER: Random 0-30 second delay ---
+        time.sleep(random.uniform(0, 30))
+
         # Check if follow-ups are enabled (sequence_length > 1)
         seq_len = self.config.CAMPAIGN_CONFIG.get("sequence_length", 2)
         

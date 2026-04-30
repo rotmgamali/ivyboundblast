@@ -1,8 +1,15 @@
 # Sensitive data
 .env
+.env.backup
 credentials/*.json
 token.json
 credentials/
+
+# Local-only large/runtime artifacts
+claude-clone/
+video_assets/
+warmup_engage_state.json
+followup_*.json
 
 # Databases
 *.db

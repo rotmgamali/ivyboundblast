@@ -24,7 +24,11 @@ RUN playwright install chromium --with-deps
 COPY . .
 
 # Create logs directory
-RUN mkdir -p mailreef_automation/logs
+RUN mkdir -p mailreef_automation/logs logs
 
-# Launch Ivybound: Email Sender
-CMD ["bash", "start_ivybound.sh"]
+# Production launch: all 3 daemons under supervised auto-restart.
+#   - IVYBOUND_SUMMER sender   (truckice, 88 inboxes)
+#   - BAHAMAS_RETREAT sender   (competitionhand, 80 inboxes)
+#   - Bahamas executive scraper (24/7, auto-syncs verified leads to Sheet)
+ENV PYTHON_BIN=python3
+CMD ["bash", "start_all.sh"]

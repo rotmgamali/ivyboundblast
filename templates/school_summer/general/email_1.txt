@@ -1,0 +1,9 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+With summer break approaching, I wanted to offer a resource that {{ school_name }} families might find useful. We run affordable summer SAT/ACT prep and academic enrichment programs designed specifically for private school students.
+
+Schools we partner with simply mention us in a parent newsletter or pass along a flyer — there's no cost or administrative work on your end. Families enroll with us directly.
+
+Would it help if I sent over a brief overview you could review or forward to the right person at {{ school_name }}?

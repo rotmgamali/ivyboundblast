@@ -1,0 +1,15 @@
+Subject: A private retreat option for {{ company_name }}
+
+Hi {{ first_name }},
+
+Following up on my previous note with a few specifics on the property.
+
+SerenitySpaces is a four-villa complex in Freeport, Grand Bahama, with capacity up to 22 across the full buyout. The Lime villa anchors the group with a full chef's kitchen and dining for 10, and every villa includes WiFi, AC, washer/dryer, pool access, and self check-in. Pricing runs $150–$650/night with a $180 cleaning fee and 3-night minimum.
+
+Logistics are simple for US-based teams: 35-minute flight from Fort Lauderdale, 50 from Miami, 5 minutes on foot to Coral Beach, USD pricing, no visa for US citizens, English-speaking. Faster door-to-door than driving to the Florida Keys.
+
+Reply if you'd like a custom proposal for {{ company_name }}, or take a look at firmconnectus.net.
+
+Best,
+Andrew
+SerenitySpaces Bahamas

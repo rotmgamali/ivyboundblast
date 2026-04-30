@@ -340,29 +340,34 @@ class ReplyWatcher:
         return replies
 
     def analyze_sentiment(self, text: str) -> str:
-        """Use GPT-4o-mini to check for high interest/positive sentiment."""
-        
+        """Analyze reply sentiment. Explicitly catches opt-out language as negative."""
+
         # Load custom prompt if defined in profile
         profile_config = automation_config.CAMPAIGN_PROFILES[self.profile_name]
         prompt_file = profile_config.get("reply_prompt")
-        
+
         if prompt_file and os.path.exists(os.path.join(BASE_DIR, prompt_file)):
             with open(os.path.join(BASE_DIR, prompt_file), 'r') as f:
                 base_prompt = f.read()
             prompt = base_prompt.replace("{{ body }}", text)
         else:
-            # Fallback to default prompt
-            prompt = f"""Analyze the sentiment of this email reply from a school administrator.
-Status options: 'positive' (interested, wants meeting, asks for info), 'negative' (not interested, stop), 'neutral' (acknowledged, away).
+            prompt = f"""Analyze this email reply from a school administrator who received cold outreach about SAT/ACT test prep.
+
+Classify as:
+- 'positive': Interested, wants to learn more, asks questions, proposes a meeting, forwards to a colleague
+- 'negative': Not interested, asks to stop, asks to be removed, says "no thanks", angry, compliance/legal threat
+- 'neutral': Out of office auto-reply, acknowledged but noncommittal, forwarded without comment
+
+CRITICAL: If the person says ANY variant of "stop", "remove", "unsubscribe", "not interested", "don't contact", "take me off", "no thank you", "please don't", "do not email" — classify as 'negative' even if the tone is polite.
 
 REPLY:
 {text}
 
 Return ONLY one word: positive, negative, or neutral."""
-        
+
         try:
             response = self.generator.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
                 max_tokens=10
@@ -476,7 +481,25 @@ Return ONLY one word: positive, negative, or neutral."""
             # 2. Sentiment Analysis
             sentiment = self.analyze_sentiment(body)
             logger.info(f"Sentiment for {from_email}: {sentiment}")
-            
+
+            # 2b. OPT-OUT ENFORCEMENT: Suppress negative replies immediately
+            if sentiment == 'negative':
+                try:
+                    from suppression_manager import SuppressionManager
+                    sm = SuppressionManager()
+                    sm.add_to_suppression(from_email, f"OPT_OUT_{self.profile_name}")
+                    logger.info(f"🚫 [OPT-OUT] Suppressed {from_email} after negative reply")
+                except Exception as e:
+                    logger.error(f"Failed to suppress opt-out {from_email}: {e}")
+
+                try:
+                    self.sheets_client.update_lead_status(
+                        email=from_email,
+                        status="opted_out"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to update sheet for opt-out {from_email}: {e}")
+
             # 3. Log to Google Sheets
             reply_data = {
                 'received_at': reply_date_str or datetime.now().isoformat(),

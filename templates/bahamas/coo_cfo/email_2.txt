@@ -1,0 +1,15 @@
+Subject: The cost breakdown for a {{ company_name }} offsite
+
+Hi {{ first_name }},
+
+Following up with the actual numbers, since that's usually the deciding factor.
+
+Villa pricing runs $150–$650/night with a $180 cleaning fee and 3-night minimum. Volume discounts kick in at 7+ nights (10–25% off). For a leadership group of 14–22, the entire property buyout typically lands at roughly a quarter of an equivalent Florida resort block — same headcount, more privacy, no per-room markups, no F&B minimums.
+
+A few logistics that simplify expensing: USD pricing pegged 1:1 (no FX line items), 35-minute flight from Fort Lauderdale (50 from Miami), and 30+ direct flights per week from South Florida. We're 5 minutes from Coral Beach, 25 from the airport. The Lime villa has a full chef's kitchen with dining for 10, which most teams use to control catering spend.
+
+Reply if you'd like a line-item proposal for {{ company_name }}, or visit firmconnectus.net.
+
+Best,
+Andrew
+SerenitySpaces Bahamas

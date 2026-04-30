@@ -19,30 +19,29 @@ INBOXES_PER_DAY_BUSINESS = 95  # Maximize: All inboxes active
 INBOXES_PER_DAY_WEEKEND = 95   # All inboxes active on weekends
 INBOX_PAUSED_IDS = []          # Dynamic pause list for health monitoring
 
-EMAILS_PER_INBOX_DAY_BUSINESS = 32 # Target: 3,000 total (95 * 32 = 3,040)
-EMAILS_PER_INBOX_DAY_WEEKEND = 32  # Maintain consistency
+EMAILS_PER_INBOX_DAY_BUSINESS = 5   # WEEK 1 CONSERVATIVE START: 5/inbox/day. Ramp up weekly: 5→10→15→20.
+EMAILS_PER_INBOX_DAY_WEEKEND = 3    # WEEK 1 CONSERVATIVE: 3/inbox/day weekends
 
 # ==================== TELEGRAM ALERTS ====================
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
 
 # ==================== SENDING WINDOWS (24-hour format, EST) ====================
-# Business days: Spaced for human-like distribution (max 3-4 per hour per inbox)
+# WEEK 1 conservative ramp: 5 emails/inbox/day spread across 5 windows (1 each)
 BUSINESS_DAY_WINDOWS = [
-    {"start": 6, "end": 7, "emails_per_inbox": 3},
-    {"start": 7, "end": 8, "emails_per_inbox": 3},
-    {"start": 8, "end": 9, "emails_per_inbox": 4},
-    {"start": 9, "end": 10, "emails_per_inbox": 4},
-    {"start": 10, "end": 11, "emails_per_inbox": 4},
-    {"start": 12, "end": 13, "emails_per_inbox": 3},
-    {"start": 15, "end": 16, "emails_per_inbox": 3},
-    {"start": 16, "end": 17, "emails_per_inbox": 3},
-    {"start": 17, "end": 18, "emails_per_inbox": 3},
-    {"start": 18, "end": 19, "emails_per_inbox": 2}, # Total: 32
+    {"start": 9, "end": 10, "emails_per_inbox": 1},
+    {"start": 11, "end": 12, "emails_per_inbox": 1},
+    {"start": 13, "end": 14, "emails_per_inbox": 1},
+    {"start": 14, "end": 15, "emails_per_inbox": 1},
+    {"start": 15, "end": 16, "emails_per_inbox": 1},  # Total: 5
 ]
 
-# Weekend days: Match Business days for maximum persistent volume
-WEEKEND_DAY_WINDOWS = BUSINESS_DAY_WINDOWS
+# Weekend: 3 emails/inbox/day across 3 windows
+WEEKEND_DAY_WINDOWS = [
+    {"start": 10, "end": 11, "emails_per_inbox": 1},
+    {"start": 12, "end": 13, "emails_per_inbox": 1},
+    {"start": 14, "end": 15, "emails_per_inbox": 1},  # Total: 3
+]
 
 # Quiet hours: No sending
 QUIET_HOURS = {"start": 21, "end": 5}
@@ -61,12 +60,41 @@ SUPPRESSION_SHEET_NAME = "Master Suppression List"
 ACTIVE_REPLIES_WORKSHEET = "Sheet 1" # Monthly tracking
 
 CAMPAIGN_CONFIG = {
-    "sequence_length": 1,  # 1-email sequence (no follow-ups)
+    "sequence_length": 2,  # 2-email sequence: Email 1 + follow-up Email 2
     "days_between_sequence": 4,  # Day 0, Day 4
     "max_retries": 3,
     "retry_delay_hours": 24,
     "stop_on_hard_bounce": True,
     "pause_on_complaint": True,
+}
+
+# ==================== CAN-SPAM COMPLIANCE ====================
+PHYSICAL_ADDRESS = "Ivybound Education Partners, PO Box [TO BE SET]"  # User must set real address
+UNSUBSCRIBE_MAILTO = "unsubscribe@web4guru.com"
+MAX_DAILY_SENDS_PER_INBOX = 5  # WEEK 1 cap. Bump to 10 (week 2), 15 (week 3), 20 (week 4+)
+
+# ==================== DELIVERABILITY THRESHOLDS ====================
+COMPLAINT_RATE_THRESHOLD = 0.003  # 0.3% — industry standard (was 1%)
+BOUNCE_RATE_THRESHOLD = 0.02      # 2% — tighter than previous 5%
+
+# ==================== SENDER IDENTITIES ====================
+SENDER_IDENTITIES = {
+    "mark": {"name": "Mark Greenstein", "title": "Ivybound Education Partners"},
+    "genelle": {"name": "Genelle Carter", "title": "Ivybound Education Partners"},
+    "andrew": {"name": "Andrew Rollins", "title": "Ivybound Education Partners"},
+    "outreach": {"name": "Andrew Rollins", "title": "Ivybound Education Partners"},
+    "default": {"name": "Andrew Rollins", "title": "Ivybound Education Partners"},
+}
+
+# Per-campaign sender identity overrides — used when a campaign needs
+# different signatures (e.g. Bahamas retreat sells from a different brand)
+BAHAMAS_SENDER_IDENTITIES = {
+    "andrew": {"name": "Andrew", "title": "SerenitySpaces Bahamas"},
+    "mark": {"name": "Mark", "title": "SerenitySpaces Bahamas"},
+    "genelle": {"name": "Genelle", "title": "SerenitySpaces Bahamas"},
+    "outreach": {"name": "Andrew", "title": "SerenitySpaces Bahamas"},
+    "alex": {"name": "Alex", "title": "SerenitySpaces Bahamas"},
+    "default": {"name": "Andrew", "title": "SerenitySpaces Bahamas"},
 }
 
 # ==================== DAY MAPPING ====================
@@ -82,12 +110,73 @@ CAMPAIGN_PROFILES = {
         "replies_sheet": "Ivy Bound - Reply Tracking",
         "replies_sheet_id": "1jeLkdufaMub4rylaPnoTQZwDiLpHmut5hcQQStl8UxI",
         "send_window_group": "default",
-        "inbox_indices": (67, 117), # Uses first 50 errorskin inboxes
+        "inbox_indices": (0, 88),  # All truckice inboxes
         "log_file": "ivybound.log",
         "template_dir": "templates",
         "campaign_type": "school",
         "subject_patterns": ["Quick question about", "Quick question for"],
-        "server_filter": "errorskin"
+        "server_filter": "truckice"  # Migrated from dead errorskin
+    },
+    "IVYBOUND_SUMMER": {
+        "input_sheet": "Ivy Bound - Campaign Leads",
+        "replies_sheet": "Ivy Bound - Reply Tracking",
+        "replies_sheet_id": "1jeLkdufaMub4rylaPnoTQZwDiLpHmut5hcQQStl8UxI",
+        "send_window_group": "default",
+        "inbox_indices": (0, 88),  # All truckice inboxes
+        "log_file": "ivybound_summer.log",
+        "templates_dir": "templates/school_summer",  # Summer-angled templates
+        "campaign_type": "school",
+        "subject_patterns": [
+            "Quick question about",
+            "summer enrichment",
+            "summer slide",
+            "summer SAT",
+        ],
+        "server_filter": "truckice",
+        "archetypes": {
+            "head_of_school": ["head of school", "headmaster", "headmistress", "president", "executive director", "superintendent"],
+            "principal": ["principal", "assistant principal", "vice principal"],
+            "academic_dean": ["dean", "academic", "curriculum", "instruction"],
+            "college_counseling": ["counselor", "college", "guidance", "advisor"],
+            "business_manager": ["business", "finance", "cfo", "bursar", "operations"],
+        },
+    },
+    "BAHAMAS_RETREAT": {
+        # Workaround: store Bahamas leads in a TAB inside the existing Ivy Bound
+        # spreadsheet because the service account's Drive quota is full.
+        "input_sheet": "Ivy Bound - Campaign Leads",
+        "input_worksheet": "Bahamas Retreat - Leads",
+        "replies_sheet": "Ivy Bound - Reply Tracking",
+        "send_window_group": "default",
+        "inbox_indices": (0, 80),  # All competitionhand inboxes
+        "log_file": "bahamas_retreat.log",
+        "templates_dir": "templates/bahamas",
+        "campaign_type": "b2b",
+        "subject_patterns": [
+            "private property",
+            "private villa",
+            "executive offsite",
+            "team retreat",
+            "{{ company_name }}",
+        ],
+        "server_filter": "competitionhand",
+        "sender_identities_override": "BAHAMAS_SENDER_IDENTITIES",
+        "system_prompt_template": (
+            "You are {sender_name} from SerenitySpaces Bahamas, a private 4-villa luxury retreat property "
+            "in Freeport, Grand Bahama. You are writing a peer-to-peer email to an executive who might "
+            "host a corporate retreat, executive offsite, or team event at the property. The villas sleep "
+            "up to 22 across the full property, $150-650/night, 35 minutes by air from Fort Lauderdale, "
+            "5-minute walk to Coral Beach, USD pricing, no visa for US citizens.\n\n"
+            "VOICE: Confident, peer-to-peer, NEVER corporate. Short sentences. Tight paragraphs.\n"
+            "BANNED PHRASES: 'I noticed', 'I'd love to', 'reaching out', 'touching base', 'synergy', 'leverage'.\n"
+            "RULES: 1) NO greeting, 2) NO sign-off, 3) Output ONLY Subject + Body, 4) NO placeholder brackets.\n"
+            "If research is empty, write a clean professional pitch without faking specifics."
+        ),
+        "archetypes": {
+            "ceo_founder": ["ceo", "founder", "owner", "president", "managing partner", "chief executive"],
+            "coo_cfo": ["coo", "cfo", "cmo", "cto", "evp", "executive vice president", "chief"],
+            "director": ["vp", "vice president", "director", "head of"],
+        },
     },
     "STRATEGY_B": {
         "input_sheet": "Web4Guru - Campaign Leads",
@@ -119,6 +208,23 @@ CAMPAIGN_PROFILES = {
         "auto_reply_template": "b2b/general/email_2.txt",
         "subject_patterns": ["Inquiry", "Question", "Growth /", "Accounting growth"],
         "server_filter": "errorskin"
+    },
+    "DEMONS_AND_DEITIES": {
+        "input_sheet": "Demons & Deities - Campaign Leads",
+        "replies_sheet": "Demons & Deities - Reply Tracking",
+        "send_window_group": "default",
+        "campaign_type": "crypto",
+        "inbox_indices": (0, 95), # Uses all 95 truckice inboxes
+        "log_file": "demons_deities.log",
+        "templates_dir": "templates/crypto",
+        "archetypes": {
+            "influencer": ["influencer", "content creator", "youtuber", "streamer", "reviewer", "creator", "host", "podcaster"],
+            "investor": ["vc", "venture", "capital", "fund", "investor", "investment", "partner", "analyst"],
+            "promoter": ["marketing", "promotion", "pr", "media", "advertising", "agency", "growth", "shill", "caller", "alpha"],
+            "general": ["general", "project", "protocol", "guild", "dao", "community"]
+        },
+        "subject_patterns": ["TFT meets blockchain", "NFT auto-battler", "Polygon game"],
+        "server_filter": "truckice"
     }
 }
 

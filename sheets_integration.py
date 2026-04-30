@@ -53,11 +53,14 @@ REPLIES_SHEET_NAME = "Ivy Bound - Reply Tracking"
 class GoogleSheetsClient:
     """Handles all Google Sheets operations for the campaign."""
     
-    def __init__(self, input_sheet_name=INPUT_SHEET_NAME, replies_sheet_name=REPLIES_SHEET_NAME, replies_sheet_id=None, replies_worksheet_name=None):
+    def __init__(self, input_sheet_name=INPUT_SHEET_NAME, replies_sheet_name=REPLIES_SHEET_NAME, replies_sheet_id=None, replies_worksheet_name=None, input_worksheet_name=None):
         self.input_sheet_name = input_sheet_name
         self.replies_sheet_name = replies_sheet_name or REPLIES_SHEET_NAME
         self.replies_sheet_id = replies_sheet_id
         self.replies_worksheet_name = replies_worksheet_name
+        # Optional override: read leads from a specific worksheet (tab) name
+        # rather than the default sheet1. Useful for multi-campaign sheets.
+        self.input_worksheet_name = input_worksheet_name
         self.logger = logger
         
         self.client: Optional[gspread.Client] = None
@@ -71,6 +74,16 @@ class GoogleSheetsClient:
         self.CACHE_TTL = timedelta(minutes=5)
         
         self._authenticate()
+
+    def _input_worksheet(self):
+        """Return the input worksheet (default: sheet1, or named tab if configured)."""
+        if self.input_worksheet_name:
+            try:
+                return self.input_sheet.worksheet(self.input_worksheet_name)
+            except Exception as e:
+                logger.error(f"Could not find worksheet '{self.input_worksheet_name}': {e}")
+                raise
+        return self.input_sheet.sheet1
 
     def retry_on_quota(f):
         @wraps(f)
@@ -95,7 +108,7 @@ class GoogleSheetsClient:
         now = datetime.now()
         if self._all_records_cache is None or (now - self._last_all_records_fetch) > self.CACHE_TTL:
             logger.info("📡 Fetching fresh records from Google Sheets...")
-            worksheet = self.input_sheet.sheet1
+            worksheet = self._input_worksheet()
             raw_records = worksheet.get_all_records()
             
             # Normalize Headers: lowercase and map synonyms
@@ -231,7 +244,7 @@ class GoogleSheetsClient:
             logger.info(f"✓ Found existing input sheet: {self.input_sheet_name}")
             
             # HARDENING: Check if empty and add headers
-            worksheet = self.input_sheet.sheet1
+            worksheet = self._input_worksheet()
             values = worksheet.get_all_values()
             
             # A completely blank sheet returns [[]] or []
@@ -278,7 +291,7 @@ class GoogleSheetsClient:
     
     def _setup_input_sheet_headers(self):
         """Set up headers for the input leads sheet."""
-        worksheet = self.input_sheet.sheet1
+        worksheet = self._input_worksheet()
         worksheet.update_title("Leads")
         
         headers = [
@@ -358,7 +371,7 @@ class GoogleSheetsClient:
         if not self.input_sheet:
             self.setup_sheets()
             
-        worksheet = self.input_sheet.sheet1
+        worksheet = self._input_worksheet()
         headers = worksheet.row_values(1)
         
         row = self._map_data_to_row(data, headers)
@@ -402,7 +415,7 @@ class GoogleSheetsClient:
         if not self.input_sheet:
             self.setup_sheets()
             
-        worksheet = self.input_sheet.sheet1
+        worksheet = self._input_worksheet()
         
         # SAFETY NET: Filter out any unverified leads before writing
         verified_leads = []
@@ -436,7 +449,7 @@ class GoogleSheetsClient:
         if not self.input_sheet:
             self.setup_sheets()
             
-        worksheet = self.input_sheet.sheet1
+        worksheet = self._input_worksheet()
         try:
             # Get header
             header = worksheet.row_values(1)
@@ -519,7 +532,7 @@ class GoogleSheetsClient:
                            sender_email: Optional[str] = None,
                            content: Optional[str] = None):
         """Update a lead's status after sending an email."""
-        worksheet = self.input_sheet.sheet1
+        worksheet = self._input_worksheet()
         
         # Find the row with this email
         try:

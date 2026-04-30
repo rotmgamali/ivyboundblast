@@ -1,10 +1,9 @@
-Subject: Scholarship ROI for {{ school_name }} families
+Subject: {{ subject }}
 
-Following up on my previous note to {{ school_name }}. Most of the School Directors we partner with are currently focused on maximizing college financial aid opportunities for their families.
+{{ personalized_opening }}
 
-We’ve found that our $375 intensive test prep program is often the deciding factor in students qualifying for merit-based scholarships—averaging over $15,000 in aid per student. 
+Independent schools compete on outcomes, and college readiness is one of the most visible differentiators for families evaluating where to invest. We help schools like {{ school_name }} offer premium SAT/ACT prep at $375 per student — a fraction of the $850+ families typically pay elsewhere.
 
-For your families, this represents a significant value-add that costs the school nothing to implement. Is this something you'd be open to discussing for 10 minutes? I'd love to share the case study from comparable schools.
+Our students average 150+ point SAT improvements and secure over $15,000 in merit aid per student. It's a zero-cost, zero-admin addition to your school's value proposition.
 
-Best regards,
-Mark Greenstein
+Would you have 10 minutes to explore whether this fits {{ school_name }}'s goals?

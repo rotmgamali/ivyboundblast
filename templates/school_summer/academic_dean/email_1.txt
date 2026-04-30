@@ -1,0 +1,9 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+Summer learning loss is one of those quiet problems — by the time it shows up in fall assessments, the damage is already done. I wanted to put something on your radar before {{ school_name }} families scatter for break.
+
+We offer structured summer programs (SAT/ACT prep for upper grades, AP review, and academic tutoring for middle school) that schools can recommend at no cost or burden to faculty. Families enroll with us directly; you just pass along the resource.
+
+Would it be helpful if I sent over a brief overview you could share with your division heads or parents?

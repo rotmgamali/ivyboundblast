@@ -1,0 +1,9 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+Reaching out with something that lands squarely on the value-per-tuition-dollar side of the ledger. With summer approaching, {{ school_name }} families are going to be spending on enrichment one way or another — and I wanted to offer a partnership that adds value to their tuition without adding a line item to your budget.
+
+We provide affordable summer SAT/ACT prep and academic enrichment that schools can pass along to families. Zero cost to {{ school_name }}, zero administrative burden — families enroll with us directly.
+
+Would it be useful if I sent over a quick summary you could review?

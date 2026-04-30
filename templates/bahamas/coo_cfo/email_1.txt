@@ -1,0 +1,7 @@
+Subject: {{ subject }}
+
+{{ personalized_opening }}
+
+Quick math on executive offsites: a comparable hotel block in South Florida or the Caribbean typically runs 3–4x what a private villa buyout costs for the same headcount. We operate a property in the Bahamas where the entire complex — sleeping up to 22 — comes in well under what most finance teams approve for a single weekend at a branded resort.
+
+Worth a brief look at the numbers for {{ company_name }}'s next planning session?

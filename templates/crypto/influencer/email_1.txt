@@ -1,0 +1,12 @@
+Subject: this game shouldn't exist yet
+
+{{ greeting }}
+
+Built a TFT-style auto-battler on Polygon. 72 NFT characters, all contracts deployed to mainnet. Not a whitepaper — it's live.
+
+Trailer: https://demonsanddeities.com/trailer
+
+Want a Founders Pass?
+
+Best,
+Andrew
