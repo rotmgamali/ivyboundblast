@@ -107,7 +107,28 @@ class EmailGenerator:
         """
         email = lead_data.get("email", "")
         url = lead_data.get("website") or lead_data.get("domain")
-        
+
+        # --- Personalization Floor ---
+        # Generic catch-all addresses (info@, contact@, hello@, etc.) carry zero
+        # personal data. Sending a "hyper-personalized" pitch to them produces
+        # a generic email branded as personal — worst of both worlds. Skip them.
+        local_part = email.split("@", 1)[0].lower() if "@" in email else ""
+        first_name = (lead_data.get("first_name") or "").strip()
+        title = (lead_data.get("title") or lead_data.get("role") or "").strip()
+        CATCH_ALL_PREFIXES = {
+            "info", "contact", "hello", "team", "office", "admin", "support",
+            "inquiries", "enquiries", "general", "mail", "email", "hi", "ask",
+            "sales", "marketing", "press", "media", "service", "services",
+        }
+        if local_part in CATCH_ALL_PREFIXES and not first_name and not title:
+            self.logger.warning(
+                f"🚫 [PERSONALIZATION FLOOR] Skipping catch-all lead with no name/title: {email}"
+            )
+            return {
+                "subject": "SKIP_LEAD",
+                "body": "Validation Failed: Catch-all email with no personalization data",
+            }
+
         # --- Institution Type Guard (Strict K-12 Filter) ---
         # Skip this filter for crypto campaigns — only applies to school outreach
         if campaign_type == "school":
@@ -208,15 +229,41 @@ class EmailGenerator:
         system_prompt, user_prompt, envelope = self._prepare_templated_prompts(
             campaign_type, template_content, lead_data, website_content, sequence_number, sender_email, custom_context, school_research
         )
-        
-        # Call LLM for Body & Subject
+
+        # Call LLM for Body & Subject; on hallucination, retry once with a
+        # stricter system prompt; on second failure, use the raw template body.
         llm_result = self._call_llm(user_prompt, system_prompt)
-        
-        self.logger.info(f"✍️ [LLM RESULT] Subject: {llm_result.get('subject')}")
-        self.logger.info(f"✍️ [LLM RESULT] Body Snippet: {llm_result.get('body')[:100]}...")
-        
-        # --- ENVELOPE REASSEMBLY ---
-        clean_body = self._strip_hallucinations(llm_result['body'], envelope['greeting'], envelope['sign_off'])
+        candidate = self._strip_hallucinations(llm_result.get("body", ""), envelope["greeting"], envelope["sign_off"])
+
+        ok, reason = self._validate_email_body(
+            candidate, template_content, lead_data, custom_context, school_research, website_content
+        )
+        if not ok:
+            self.logger.warning(f"⚠️ [HALLUCINATION] Rejected first draft for {lead_data.get('email')}: {reason}. Retrying.")
+            stricter_system = (
+                system_prompt
+                + "\n\nSTRICT MODE: Do NOT invent statistics, dollar amounts, percentages, "
+                "student counts, school details, or program features. Use ONLY facts that appear "
+                "in the template or in the research provided. If you cannot personalize without "
+                "inventing, write a clean professional pitch using only the offer details from the template."
+            )
+            llm_result = self._call_llm(user_prompt, stricter_system)
+            candidate = self._strip_hallucinations(llm_result.get("body", ""), envelope["greeting"], envelope["sign_off"])
+            ok, reason = self._validate_email_body(
+                candidate, template_content, lead_data, custom_context, school_research, website_content
+            )
+            if not ok:
+                self.logger.warning(
+                    f"⚠️ [HALLUCINATION] Retry also failed for {lead_data.get('email')}: {reason}. "
+                    f"Falling back to raw template body."
+                )
+                # Strip any remaining template variables/placeholders from the raw template
+                fallback = self._TEMPLATE_VAR_RE.sub("", template_content or "").strip()
+                fallback = self._PLACEHOLDER_RE.sub("", fallback).strip()
+                candidate = fallback
+                # Use envelope-derived subject so we still have a valid subject line
+                llm_result = {"subject": envelope.get("subject", "Quick question"), "body": candidate}
+        clean_body = candidate
         
         # FINAL PROTECTION: Ensure no "Hi [Name]" if we already have it in clean_body
         final_greeting = envelope['greeting']
@@ -819,6 +866,80 @@ SUBJECT: [subject line]
 
 BODY: [full body text]"""
         return system_prompt, user_prompt, envelope
+
+    # Numbers the LLM is allowed to use without an explicit source. These
+    # come from the campaign's own offer (templates) plus harmless years.
+    _APPROVED_NUMBERS = {
+        "10", "15", "18", "20", "22", "25", "50", "100", "125", "150", "200",
+        "250", "300", "375", "500", "650", "675", "850", "1000", "1500", "2000",
+        "10000", "125000", "1000000",
+    }
+    _PLACEHOLDER_RE = re.compile(
+        r"\[(?:Name|City|School|Company|Year|N|X|Insert|Specific|Detail|First|Last|Mascot|Number|Stat|"
+        r"School Name|Company Name|First Name|Last Name|Date|Day|Month|Time)\b[^\]]*\]",
+        re.IGNORECASE,
+    )
+    _TEMPLATE_VAR_RE = re.compile(r"\{\{[^}]+\}\}|\{[a-zA-Z_]+\}")
+    # 2+ digit numbers, optionally with %, +, k/K, m/M, or $ prefix
+    _NUMBER_TOKEN_RE = re.compile(r"\$?\d{2,}(?:[,]\d{3})*(?:\.\d+)?[%+kKmM]?")
+
+    def _validate_email_body(
+        self,
+        body: str,
+        template_content: str,
+        lead_data: dict,
+        custom_context: str,
+        school_research: dict,
+        website_content: str,
+    ) -> tuple[bool, str]:
+        """Catch obvious hallucinations: placeholders, length runaways, and
+        specific numeric claims that don't appear in any source the AI was
+        shown. Returns (is_valid, reason). Reason is "OK" when valid."""
+        if not body or not body.strip():
+            return False, "empty body"
+
+        word_count = len(body.split())
+        if word_count < 50:
+            return False, f"too short ({word_count} words)"
+        if word_count > 230:
+            return False, f"too long ({word_count} words)"
+
+        if self._PLACEHOLDER_RE.search(body):
+            return False, "unfilled placeholder bracket"
+        if self._TEMPLATE_VAR_RE.search(body):
+            return False, "unrendered template variable"
+
+        # Source haystack the AI was actually given. Anything numeric outside
+        # this set is suspect.
+        try:
+            source_blob = " ".join([
+                template_content or "",
+                json.dumps(lead_data, default=str),
+                custom_context or "",
+                json.dumps(school_research or {}, default=str),
+                (website_content or "")[:6000],
+            ]).lower()
+        except Exception:
+            source_blob = (template_content or "").lower() + " " + (custom_context or "").lower()
+
+        for raw in self._NUMBER_TOKEN_RE.findall(body):
+            digits = re.sub(r"[^\d]", "", raw)
+            if not digits or len(digits) < 2:
+                continue
+            n = int(digits)
+            # Years are fine
+            if 1900 <= n <= 2100:
+                continue
+            if digits in self._APPROVED_NUMBERS:
+                continue
+            if digits in source_blob:
+                continue
+            # Check the raw token (e.g. "$125,000") in the source as written
+            if raw.lower() in source_blob:
+                continue
+            return False, f"fabricated number '{raw}' not in source"
+
+        return True, "OK"
 
     def _strip_hallucinations(self, body_text: str, greeting: str, sign_off: str) -> str:
         """Failsafe: If AI wrote 'Hi Andrew,' or 'Best, Name' anyway, remove it."""

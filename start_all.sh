@@ -55,14 +55,19 @@ log "Workdir: $(pwd)"
 spawn_supervised "IVYBOUND_SUMMER" \
   "$PYTHON_BIN" mailreef_automation/main.py --profile IVYBOUND_SUMMER
 
-# 2. Bahamas Retreat email sender (competitionhand, 80 inboxes)
-spawn_supervised "BAHAMAS_RETREAT" \
-  "$PYTHON_BIN" mailreef_automation/main.py --profile BAHAMAS_RETREAT
+# 2. Bahamas Retreat email sender — PAUSED.
+#    The 84 competitionhand inboxes are on web4guru.online / agentsdirect.online /
+#    airagents.online style domains. Sending a "SerenitySpaces Bahamas" pitch
+#    from those domains is a brand/SPF mismatch that will torch deliverability.
+#    Restart only after Bahamas-aligned domains are provisioned in Mailreef.
+# spawn_supervised "BAHAMAS_RETREAT" \
+#   "$PYTHON_BIN" mailreef_automation/main.py --profile BAHAMAS_RETREAT
 
-# 3. Bahamas executive scraper daemon (24/7, auto-syncs verified leads to sheet)
+# 3. Bahamas executive scraper daemon (24/7, auto-syncs verified leads to sheet).
+#    Keep running so the lead pool builds while we sort out the sender domains.
 spawn_supervised "BAHAMAS_SCRAPER" \
   "$PYTHON_BIN" bahamas_daemon.py \
     --auto-sync-sheets --max-per-city 25 --cities-per-cycle 3 --cycle-rest-min 90
 
-log "All 3 daemons spawned. Waiting forever..."
+log "Daemons spawned (BAHAMAS_RETREAT sender paused — domain mismatch). Waiting forever..."
 wait

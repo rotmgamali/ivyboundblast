@@ -79,28 +79,65 @@ class EmailScheduler:
 
         # Daily send cap tracking (inbox_id_YYYYMMDD -> count)
         self._daily_send_counts = {}
-        self._daily_cap = getattr(config, 'MAX_DAILY_SENDS_PER_INBOX', 20)
-        
+        # Ramped cap (recomputed each scheduling pass via _ramped_cap()).
+        self._daily_cap = self._ramped_cap()
+
+    def _ramped_cap(self):
+        """Per-inbox/day cap from the weekly ramp schedule, with safe fallback."""
+        get_caps = getattr(self.config, 'get_current_ramp_caps', None)
+        if callable(get_caps):
+            caps = get_caps()
+            return caps["max_per_inbox"]
+        return getattr(self.config, 'MAX_DAILY_SENDS_PER_INBOX', 20)
+
+    def _ramp_targets(self, day_type):
+        """Per-inbox/day target for business or weekend, honoring the weekly ramp."""
+        get_caps = getattr(self.config, 'get_current_ramp_caps', None)
+        if callable(get_caps):
+            caps = get_caps()
+            return caps["business"] if day_type == "business" else caps["weekend"]
+        if day_type == "business":
+            return self.config.EMAILS_PER_INBOX_DAY_BUSINESS
+        return self.config.EMAILS_PER_INBOX_DAY_WEEKEND
+
     def calculate_daily_send_requirements(self, day_type):
         """Calculate how many emails each inbox should send today"""
         if day_type == "business":
             active_inboxes = self.config.INBOXES_PER_DAY_BUSINESS
-            emails_per_inbox = self.config.EMAILS_PER_INBOX_DAY_BUSINESS
         else:
             active_inboxes = self.config.INBOXES_PER_DAY_WEEKEND
-            emails_per_inbox = self.config.EMAILS_PER_INBOX_DAY_WEEKEND
-            
+        emails_per_inbox = self._ramp_targets(day_type)
+
         return {
             "total_emails": active_inboxes * emails_per_inbox,
             "active_inboxes": active_inboxes,
             "emails_per_inbox": emails_per_inbox
         }
-    
+
     def generate_send_slots(self, day_type, inbox_count):
         """Generate time slots for sending emails with natural variance"""
-        windows = (self.config.BUSINESS_DAY_WINDOWS 
-                   if day_type == "business" 
-                   else self.config.WEEKEND_DAY_WINDOWS)
+        # Refresh the ramped daily cap each scheduling pass.
+        self._daily_cap = self._ramped_cap()
+
+        base_windows = (self.config.BUSINESS_DAY_WINDOWS
+                        if day_type == "business"
+                        else self.config.WEEKEND_DAY_WINDOWS)
+        # Scale each window's emails_per_inbox so today's per-inbox total
+        # matches the ramped target. Base = sum of static window emails.
+        target_per_inbox = self._ramp_targets(day_type)
+        base_total = sum(w.get("emails_per_inbox", 1) for w in base_windows) or 1
+        if target_per_inbox != base_total and base_windows:
+            # Distribute target_per_inbox across windows, weighted by base.
+            from copy import deepcopy
+            windows = deepcopy(base_windows)
+            quotient, remainder = divmod(target_per_inbox, len(windows))
+            for i, w in enumerate(windows):
+                w["emails_per_inbox"] = quotient + (1 if i < remainder else 0)
+            self.logger.info(
+                f"📈 [RAMP] day_type={day_type} target={target_per_inbox}/inbox spread across {len(windows)} windows"
+            )
+        else:
+            windows = base_windows
         
         slots = []
         

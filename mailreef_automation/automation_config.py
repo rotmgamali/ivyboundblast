@@ -19,8 +19,39 @@ INBOXES_PER_DAY_BUSINESS = 95  # Maximize: All inboxes active
 INBOXES_PER_DAY_WEEKEND = 95   # All inboxes active on weekends
 INBOX_PAUSED_IDS = []          # Dynamic pause list for health monitoring
 
-EMAILS_PER_INBOX_DAY_BUSINESS = 5   # WEEK 1 CONSERVATIVE START: 5/inbox/day. Ramp up weekly: 5→10→15→20.
-EMAILS_PER_INBOX_DAY_WEEKEND = 3    # WEEK 1 CONSERVATIVE: 3/inbox/day weekends
+EMAILS_PER_INBOX_DAY_BUSINESS = 5   # Static fallback. The live cap comes from get_current_ramp_caps().
+EMAILS_PER_INBOX_DAY_WEEKEND = 3    # Static fallback. The live cap comes from get_current_ramp_caps().
+
+# ==================== WEEKLY RAMP (auto-escalating) ====================
+# Set when the senders went live on Railway. Override via the
+# CAMPAIGN_START_DATE env var to reset / pause the ramp.
+CAMPAIGN_START_DATE = os.environ.get("CAMPAIGN_START_DATE", "2026-04-30")
+# Per-inbox/day for week 1, 2, 3, 4+. Stays at index 3 after week 4.
+WEEKLY_RAMP_BUSINESS = [5, 10, 15, 20]
+WEEKLY_RAMP_WEEKEND = [3, 5, 7, 10]
+
+
+def get_current_ramp_caps(today=None):
+    """Return today's per-inbox caps based on weeks since CAMPAIGN_START_DATE.
+
+    Returns a dict with business/weekend per-inbox targets, the max daily cap
+    (= business target), and the 1-indexed week number for logging.
+    """
+    from datetime import date
+    if today is None:
+        today = date.today()
+    try:
+        start = date.fromisoformat(CAMPAIGN_START_DATE)
+    except Exception:
+        start = today
+    days = max(0, (today - start).days)
+    week_idx = min(len(WEEKLY_RAMP_BUSINESS) - 1, days // 7)
+    return {
+        "business": WEEKLY_RAMP_BUSINESS[week_idx],
+        "weekend": WEEKLY_RAMP_WEEKEND[week_idx],
+        "max_per_inbox": WEEKLY_RAMP_BUSINESS[week_idx],
+        "week": week_idx + 1,
+    }
 
 # ==================== TELEGRAM ALERTS ====================
 TELEGRAM_BOT_TOKEN = ""
