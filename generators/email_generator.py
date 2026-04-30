@@ -41,6 +41,14 @@ class EmailGenerator:
     Uses 'Archetypes' to select the correct template folder (e.g. /principal).
     """
 
+    # Placeholder/generic titles set by the harvester when no real title was
+    # found. Treated as if the title were blank, both for the catch-all skip
+    # and for greeting selection (so we never emit "Hi Office," / "Hi Administrator,").
+    PLACEHOLDER_TITLES = {
+        "office", "staff", "team", "general", "unknown", "n/a", "na",
+        "administrator", "admin", "contact", "info",
+    }
+
     # Mapping of role keywords to template folders
     ARCHETYPES = {
         "principal": ["principal", "assistant principal", "vice principal"],
@@ -114,7 +122,8 @@ class EmailGenerator:
         # a generic email branded as personal — worst of both worlds. Skip them.
         local_part = email.split("@", 1)[0].lower() if "@" in email else ""
         first_name = (lead_data.get("first_name") or "").strip()
-        title = (lead_data.get("title") or lead_data.get("role") or "").strip()
+        raw_title = (lead_data.get("title") or lead_data.get("role") or "").strip()
+        title = "" if raw_title.lower() in self.PLACEHOLDER_TITLES else raw_title
         CATCH_ALL_PREFIXES = {
             "info", "contact", "hello", "team", "office", "admin", "support",
             "inquiries", "enquiries", "general", "mail", "email", "hi", "ask",
@@ -122,7 +131,7 @@ class EmailGenerator:
         }
         if local_part in CATCH_ALL_PREFIXES and not first_name and not title:
             self.logger.warning(
-                f"🚫 [PERSONALIZATION FLOOR] Skipping catch-all lead with no name/title: {email}"
+                f"🚫 [PERSONALIZATION FLOOR] Skipping catch-all lead with no name/title: {email} (raw_title='{raw_title}')"
             )
             return {
                 "subject": "SKIP_LEAD",
@@ -179,10 +188,17 @@ class EmailGenerator:
                 try:
                     if not url.startswith("http"):
                         url = "https://" + url
-                    school_research = self._smart_scrape(url)
+                    # Route by campaign type: schools want mission/programs/athletics,
+                    # B2B wants company description / services / leadership / about.
+                    if campaign_type == "b2b":
+                        school_research = self._b2b_scrape(url)
+                        scrape_label = "B2B SCRAPE"
+                    else:
+                        school_research = self._smart_scrape(url)
+                        scrape_label = "SMART SCRAPE"
                     website_content = school_research.get("raw", "")
                     non_empty = sum(1 for k, v in school_research.items() if v and k != "raw")
-                    self.logger.info(f"✅ [SMART SCRAPE] Extracted {non_empty} structured fields from {url}")
+                    self.logger.info(f"✅ [{scrape_label}] Extracted {non_empty} structured fields from {url}")
                 except Exception as e:
                     self.logger.error(f"❌ [SCRAPE ERROR] Failed for {url}: {e}")
                     school_research = {}
@@ -382,6 +398,167 @@ class EmailGenerator:
 
         except Exception as e:
             self.logger.error(f"Smart scrape failed for {url}: {e}")
+
+        return result
+
+    def _b2b_scrape(self, url: str) -> dict:
+        """Extract B2B-shaped facts from a company website (description, what
+        they do, who runs it, where they are). Mirrors _smart_scrape's signature
+        so the generator's prompt-builder can consume it the same way."""
+        import requests
+        from bs4 import BeautifulSoup
+        import re as _re
+
+        result = {
+            "raw": "",
+            "mission": "",        # tagline / "about us" blurb
+            "programs": "",       # services / what they do
+            "achievements": "",   # awards / recognition
+            "enrollment": "",     # company size / "Nx employees" / "founded"
+            "faith": "",          # leadership names if detectable
+            "athletics": "",      # industry / category
+            "mascot": "",         # company name (from <title>)
+        }
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        }
+
+        def _clean_soup_text(soup) -> str:
+            for tag in soup(["script", "style", "nav", "footer", "header", "iframe", "noscript", "form"]):
+                tag.decompose()
+            txt = soup.get_text(separator="\n")
+            lines = [l.strip() for l in txt.splitlines() if l.strip() and len(l.strip()) > 8]
+            return "\n".join(lines)
+
+        try:
+            response = requests.get(url, headers=headers, timeout=15, verify=False)
+            if response.status_code != 200:
+                return result
+
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            # Capture company name from <title> (often "Company Name | Tagline")
+            title_tag = soup.find("title")
+            if title_tag and title_tag.text:
+                title_str = title_tag.text.strip()
+                # Trim "| Tagline" or " - Tagline" suffix
+                first = _re.split(r"\s+[\|\-–—]\s+", title_str, maxsplit=1)[0].strip()
+                if 3 < len(first) < 80:
+                    result["mascot"] = first  # reused field: company display name
+
+            # Meta description = best one-line "about us" candidate
+            meta_desc = soup.find("meta", attrs={"name": _re.compile("^description$", _re.I)})
+            if meta_desc and meta_desc.get("content"):
+                result["mission"] = meta_desc["content"].strip()[:400]
+            else:
+                og_desc = soup.find("meta", attrs={"property": _re.compile("^og:description$", _re.I)})
+                if og_desc and og_desc.get("content"):
+                    result["mission"] = og_desc["content"].strip()[:400]
+
+            clean_text = _clean_soup_text(soup)
+            text_lower = clean_text.lower()
+            result["raw"] = clean_text[:3500]
+
+            # Fallback "about us" blurb from body text
+            if len(result["mission"]) < 40:
+                for keyword in ["about us", "who we are", "our story", "our mission", "what we do", "our company"]:
+                    idx = text_lower.find(keyword)
+                    if idx != -1:
+                        chunk = clean_text[idx:idx + 600]
+                        sentences = [s.strip() for s in chunk.split(".") if len(s.strip()) > 20][:3]
+                        if sentences:
+                            result["mission"] = ". ".join(sentences)[:400]
+                        break
+
+            # Services / "what they do"
+            service_kws = [
+                "our services", "what we offer", "what we do", "products", "solutions",
+                "services include", "specializing in", "we provide", "expertise",
+            ]
+            for kw in service_kws:
+                idx = text_lower.find(kw)
+                if idx != -1:
+                    result["programs"] = clean_text[idx:idx + 350].strip()[:350]
+                    break
+
+            # Founded year
+            founded_match = _re.search(
+                r"(?:founded|established|since|est\.?|operating since)\s*(?:in\s+)?(?:the\s+year\s+)?(\d{4})",
+                text_lower,
+            )
+            if founded_match:
+                year = founded_match.group(1)
+                # Reject obviously wrong (e.g. parsing "200 customers" as year)
+                if 1850 <= int(year) <= 2026:
+                    result["enrollment"] = f"Founded {year}"
+
+            # Employee count / size
+            size_match = _re.search(
+                r"(\d{2,5}(?:,\d{3})?)\s*(?:employees|team members|professionals|people|associates)",
+                clean_text,
+                _re.IGNORECASE,
+            )
+            if size_match:
+                size_str = size_match.group(0).strip()
+                if result["enrollment"]:
+                    result["enrollment"] = f"{result['enrollment']} | {size_str}"
+                else:
+                    result["enrollment"] = size_str
+
+            # Awards / accolades
+            for kw in ["award", "recognition", "ranked", "featured in", "voted", "best of",
+                       "as seen in", "named one of", "accreditation"]:
+                idx = text_lower.find(kw)
+                if idx != -1:
+                    result["achievements"] = clean_text[max(0, idx - 30):idx + 250].strip()[:300]
+                    break
+
+            # Industry hint — pick first category-ish keyword present
+            industry_kws = [
+                "manufacturing", "real estate", "law firm", "consulting", "marketing",
+                "construction", "logistics", "healthcare", "technology", "software",
+                "finance", "insurance", "hospitality", "retail", "wholesale", "design",
+                "engineering", "research", "agency",
+            ]
+            hits = [kw for kw in industry_kws if kw in text_lower]
+            if hits:
+                result["athletics"] = ", ".join(hits[:3]).title()
+
+            # Leadership / founder names — look for "Founded by X" / "CEO X" patterns
+            leader_match = _re.search(
+                r"(?:founded by|ceo|founder|president|managing partner|managing director)\s*[:\-,]?\s*([A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+)",
+                clean_text,
+            )
+            if leader_match:
+                result["faith"] = leader_match.group(1).strip()  # reused: leadership name
+
+            # If homepage was thin, try /about
+            if len(result["mission"]) < 60 and len(result["programs"]) < 60:
+                for path in ("/about", "/about-us", "/company", "/our-story"):
+                    try:
+                        about_url = url.rstrip("/") + path
+                        resp2 = requests.get(about_url, headers=headers, timeout=10, verify=False)
+                        if resp2.status_code != 200:
+                            continue
+                        soup2 = BeautifulSoup(resp2.text, "html.parser")
+                        about_text = _clean_soup_text(soup2)
+                        about_lower = about_text.lower()
+                        for keyword in ["our mission", "about us", "who we are", "our story", "what we do"]:
+                            idx = about_lower.find(keyword)
+                            if idx != -1:
+                                chunk = about_text[idx:idx + 600]
+                                sentences = [s.strip() for s in chunk.split(".") if len(s.strip()) > 20][:3]
+                                if sentences:
+                                    result["mission"] = ". ".join(sentences)[:400]
+                                break
+                        if result["mission"]:
+                            break
+                    except Exception:
+                        continue
+
+        except Exception as e:
+            self.logger.error(f"B2B scrape failed for {url}: {e}")
 
         return result
 
@@ -590,8 +767,15 @@ Respond in JSON only:
                         first_name = f"{title} {first_name}"
                         break
             greeting_line = f"Hey {first_name}," if campaign_type == "crypto" else f"Hi {first_name},"
-        elif role and len(role) > 2 and role.lower() not in ["high school", "middle school", "elementary school", "pk-12", "preschool", "academy"]:
-            # Fallback to Role-based (e.g. Hi Principal,)
+        elif (
+            role
+            and len(role) > 2
+            and role.lower() not in {"high school", "middle school", "elementary school", "pk-12", "preschool", "academy"}
+            and role.lower() not in self.PLACEHOLDER_TITLES
+        ):
+            # Fallback to Role-based (e.g. Hi Principal,) — but never for
+            # placeholder titles like "Office" / "Administrator" / "Staff",
+            # which would produce awkward greetings like "Hi Office,".
             first_name = role.title()
             greeting_line = f"Hey {first_name}," if campaign_type == "crypto" else f"Hi {first_name},"
         elif school_name and school_name.lower() != "your school":

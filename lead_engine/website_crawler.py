@@ -161,21 +161,73 @@ def _extract_staff(html: str) -> List[Dict]:
                 "email": email_el.get_text(strip=True).lower() if email_el else "",
             })
 
-    # Pattern 3: Look for "Name, Title" or "Title: Name" in text
+    # Pattern 3: Look for "Name, Title" or "Name — Title" / "Name | Title" in text
     text = soup.get_text(separator="\n")
     title_keywords = ["principal", "director", "dean", "manager", "owner", "partner",
                        "dds", "dmd", "attorney", "counselor", "superintendent", "founder",
-                       "president", "ceo", "cfo", "head of school", "dr.", "pastor", "reverend"]
+                       "president", "ceo", "cfo", "coo", "cmo", "cto", "evp", "svp",
+                       "vice president", "head of school", "head of", "managing", "chief",
+                       "dr.", "pastor", "reverend", "rabbi", "executive director"]
+    name_pattern = r'^([A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+(?:-[A-Z][a-z]+)?)'
+    sep_pattern = r'[,\-–—\|:]'
     for line in text.split("\n"):
         line = line.strip()
-        if not line or len(line) > 100 or len(line) < 5:
+        if not line or len(line) > 120 or len(line) < 5:
             continue
         line_lower = line.lower()
         if any(kw in line_lower for kw in title_keywords):
-            # Try "Name, Title" pattern
-            match = re.match(r'^([A-Z][a-z]+ [A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),?\s+(.+)$', line)
-            if match:
-                contacts.append({"name": match.group(1).strip(), "title": match.group(2).strip(), "email": ""})
+            # "Name, Title" / "Name — Title" / "Name | Title"
+            m = re.match(f"{name_pattern}\\s*{sep_pattern}\\s*(.+)$", line)
+            if m:
+                title = m.group(2).strip()
+                if 2 < len(title) < 80:
+                    contacts.append({"name": m.group(1).strip(), "title": title, "email": ""})
+
+    # Pattern 4: Adjacent heading/paragraph pairs — common on /team and /about
+    # pages. <h3>Jane Smith</h3><p>Founder & CEO</p>
+    name_only_re = re.compile(name_pattern)
+    for tag in soup.find_all(["h2", "h3", "h4"]):
+        head_text = tag.get_text(strip=True)
+        if not (5 < len(head_text) < 60):
+            continue
+        head_match = name_only_re.match(head_text)
+        if not head_match:
+            continue
+        # Pull text from the next sibling-ish element
+        nxt = tag.find_next_sibling()
+        candidate_title = ""
+        for _ in range(2):
+            if nxt is None:
+                break
+            txt = nxt.get_text(separator=" ", strip=True)
+            if txt and 2 < len(txt) < 100:
+                if any(kw in txt.lower() for kw in title_keywords):
+                    candidate_title = txt
+                    break
+                # If it's just a one-line role even without keyword, take it
+                if len(txt.split()) <= 6 and txt[:1].isalpha():
+                    candidate_title = txt
+                    break
+            nxt = nxt.find_next_sibling() if hasattr(nxt, "find_next_sibling") else None
+        if candidate_title:
+            contacts.append({
+                "name": head_match.group(1).strip(),
+                "title": candidate_title.strip(),
+                "email": "",
+            })
+
+    # Pattern 5: "Founded by X" / "led by X" / "X is the CEO" patterns
+    leader_patterns = [
+        r"(?:founded by|founder|led by)\s+([A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+)",
+        r"([A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+)\s+(?:is|serves as)\s+(?:the\s+)?(ceo|founder|president|managing partner|coo|cfo|owner|principal)",
+        r"(?:meet|introducing)\s+([A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+),?\s+(.{3,40}?)(?:\.|\n|$)",
+    ]
+    for pat in leader_patterns:
+        for m in re.finditer(pat, text):
+            name = m.group(1).strip()
+            title = (m.group(2).strip() if m.lastindex and m.lastindex >= 2 else "Leadership")
+            if 2 < len(title) < 80:
+                contacts.append({"name": name, "title": title, "email": ""})
 
     return contacts
 

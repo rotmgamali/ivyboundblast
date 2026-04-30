@@ -57,6 +57,41 @@ logger = logging.getLogger("harvest")
 # Limit concurrent Apify API calls to avoid rate limits
 apify_semaphore = threading.Semaphore(3)
 
+# Title rankings for picking the most-senior named contact off a /team page.
+# Higher score = more decision-maker authority for cold outreach.
+_TITLE_SCORES = (
+    (("ceo", "chief executive"), 100),
+    (("founder", "co-founder", "owner"), 95),
+    (("president",), 90),
+    (("managing partner", "managing director"), 85),
+    (("coo", "cfo", "cmo", "cto", "chief"), 80),
+    (("evp", "executive vice president"), 70),
+    (("svp", "senior vice president"), 65),
+    (("vp", "vice president"), 60),
+    (("director", "head of"), 50),
+    (("partner",), 45),
+    (("manager",), 30),
+)
+
+
+def _pick_best_named_contact(named_contacts: list) -> dict:
+    """Return the highest-ranking {name, title} contact, or {} if list is empty.
+    Used to attach a real decision-maker's name to a synthetic catch-all email."""
+    if not named_contacts:
+        return {}
+    def _score(c):
+        title_lower = (c.get("title") or "").lower()
+        for keywords, score in _TITLE_SCORES:
+            if any(kw in title_lower for kw in keywords):
+                return score
+        # No keyword match — keep but rank lowest so explicit roles win
+        return 0
+    ranked = sorted(named_contacts, key=_score, reverse=True)
+    top = ranked[0]
+    if not top.get("name"):
+        return {}
+    return top
+
 
 def harvest_city(city: str, niche: str, run_id: int, max_per_city: int,
                  db: HarvestDB, verifier: EmailVerifier,
@@ -99,6 +134,7 @@ def harvest_city(city: str, niche: str, run_id: int, max_per_city: int,
 
         # 3. Extract contacts from website
         all_contacts = list(biz.get("raw_emails", []))
+        crawled_named_contacts = []  # contacts with a name/title but no email
         if biz.get("website"):
             crawled = extract_contacts(biz["website"], niche)
             # Merge crawled emails with Apify emails
@@ -112,6 +148,8 @@ def harvest_city(city: str, niche: str, run_id: int, max_per_city: int,
             for contact in crawled_contacts:
                 if contact.get("email") and not any(c.get("email") == contact["email"] for c in all_contacts):
                     all_contacts.append(contact)
+                elif contact.get("name") and not contact.get("email"):
+                    crawled_named_contacts.append(contact)
 
         # 3b. Generate synthetic email candidates if website crawling found nothing.
         # Most B2B sites hide exec emails — but companies usually have generic
@@ -123,12 +161,29 @@ def harvest_city(city: str, niche: str, run_id: int, max_per_city: int,
                 if host.startswith("www."):
                     host = host[4:]
                 if host and "." in host:
+                    # If we extracted any real names from the team/about page,
+                    # attach the highest-ranking person's name + title to the
+                    # synthetic catch-all so the downstream email is at least
+                    # addressed to a real decision-maker.
+                    best = _pick_best_named_contact(crawled_named_contacts)
+                    best_first = ""
+                    best_last = ""
+                    best_title = ""
+                    if best:
+                        parts = best["name"].split()
+                        if parts:
+                            best_first = parts[0]
+                            best_last = " ".join(parts[1:]) if len(parts) > 1 else ""
+                        best_title = best.get("title", "").strip()
                     for prefix in ("info", "contact", "hello", "team", "office"):
                         all_contacts.append({
                             "email": f"{prefix}@{host}",
-                            "name": "",
-                            "title": "",  # Empty title → email_generator falls back to "To the {company} Team,"
+                            "name": best.get("name", "") if best else "",
+                            "first_name": best_first,
+                            "last_name": best_last,
+                            "title": best_title,
                             "synthetic": True,
+                            "name_source": "team_page" if best else "",
                         })
             except Exception:
                 pass
