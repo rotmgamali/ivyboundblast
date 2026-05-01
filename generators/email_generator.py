@@ -282,9 +282,8 @@ class EmailGenerator:
                     f"⚠️ [HALLUCINATION] Retry also failed for {lead_data.get('email')}: {reason}. "
                     f"Falling back to raw template body."
                 )
-                # Build a clean subject by trying real subject_patterns from
-                # the campaign profile, then stripping any remaining template
-                # variables / unfilled placeholders from the body fallback.
+                # Build a clean subject. The pre-computed envelope.fallback_body
+                # already has lead_data substituted in and template vars stripped.
                 fallback_subj = envelope.get("subject", "")
                 if "{{" in fallback_subj or not fallback_subj.strip() or fallback_subj.strip() == "Subject:":
                     patterns = (getattr(self, "profile_config", {}) or {}).get("subject_patterns", [])
@@ -295,16 +294,7 @@ class EmailGenerator:
                     if "Quick question" in pick and company_name:
                         pick = f"Quick question about {company_name}"
                     fallback_subj = pick
-                # Strip remaining template variables / placeholders / leftover Subject line
-                fallback = self._TEMPLATE_VAR_RE.sub("", template_content or "").strip()
-                fallback = self._PLACEHOLDER_RE.sub("", fallback).strip()
-                fallback = re.sub(r"(?im)^\s*Subject:.*$\n?", "", fallback).strip()
-                # Drop any leading/trailing greeting/sign-off lines from the
-                # template since the envelope adds those back.
-                fallback = re.sub(r"^(?i)(?:Hi|Dear|Good|Hello|To the).*?,\s*\n+", "", fallback).strip()
-                # Collapse runs of double-spaces from removed placeholders
-                fallback = re.sub(r" {2,}", " ", fallback)
-                candidate = fallback
+                candidate = envelope.get("fallback_body") or ""
                 llm_result = {"subject": fallback_subj or "Quick question", "body": candidate}
         clean_body = candidate
         
@@ -906,10 +896,19 @@ Respond in JSON only:
         # Define the deterministic shell. Include company line so brand is correct
         # for non-Ivybound campaigns (e.g. SerenitySpaces Bahamas).
         sign_off_block = f"Best,\n{sender_name}\n{sender_company}"
+        # Pre-compute the fallback-ready clean body: lead-data substituted,
+        # subject/greeting/sign-off stripped, any remaining {{ ... }} or
+        # placeholder-bracket variables removed, double-spaces collapsed.
+        # Used when the AI's draft is rejected twice by the hallucination guard.
+        fallback_body = clean_draft
+        fallback_body = self._TEMPLATE_VAR_RE.sub("", fallback_body)
+        fallback_body = self._PLACEHOLDER_RE.sub("", fallback_body)
+        fallback_body = re.sub(r" {2,}", " ", fallback_body).strip()
         envelope = {
             "greeting": greeting_line,
             "sign_off": sign_off_block,
-            "subject": template_subject # Default, AI will override if instructed
+            "subject": template_subject,  # Default, AI will override if instructed
+            "fallback_body": fallback_body,
         }
         
         # --- 5. System Prompt (Constraint) ---
@@ -1059,12 +1058,16 @@ TASK:
 
 2. PERSONALIZED OPENING (1-2 sentences): Reference ONE specific detail from the research — a program, achievement, mission phrase, athletic team, or faith community. Make it genuine. If research is thin, write a clean professional opener without faking specifics.
 
-3. CORE PITCH: Keep the template's key facts:
-   - $375 program price
+3. CORE PITCH: Use ONLY these exact facts. DO NOT invent or rephrase numbers.
+   - $375 program price (vs. $850+ market rate)
    - 150+ point average SAT increase
-   - $15,000+ in merit aid per student
+   - $125,000+ average merit scholarship awards earned across our students
+   - 10,000+ students served, 25 years of track record
+   - 100+ point score guarantee (50% refund if not met)
    - Zero cost to the school
    - 10-minute call CTA
+   STRICTLY FORBIDDEN: do NOT say "$15,000 per student" or any per-student dollar
+   amount. Do NOT invent statistics. If a number isn't in this list, omit it.
 
 4. CONSTRAINTS:
    - No greetings or sign-offs.
@@ -1121,7 +1124,14 @@ BODY: [full body text]"""
             return False, "unrendered template variable"
 
         # Source haystack the AI was actually given. Anything numeric outside
-        # this set is suspect.
+        # this set is suspect. Include the campaign system_prompt_template so
+        # offer-specific facts (e.g. Bahamas "35 minutes by air") aren't flagged.
+        system_facts = ""
+        try:
+            if hasattr(self, "profile_config") and self.profile_config:
+                system_facts = (self.profile_config.get("system_prompt_template") or "")
+        except Exception:
+            pass
         try:
             source_blob = " ".join([
                 template_content or "",
@@ -1129,6 +1139,7 @@ BODY: [full body text]"""
                 custom_context or "",
                 json.dumps(school_research or {}, default=str),
                 (website_content or "")[:6000],
+                system_facts,
             ]).lower()
         except Exception:
             source_blob = (template_content or "").lower() + " " + (custom_context or "").lower()
