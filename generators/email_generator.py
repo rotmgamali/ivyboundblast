@@ -148,23 +148,50 @@ class EmailGenerator:
             }
 
         # --- Institution Type Guard (Strict K-12 Filter) ---
-        # Skip this filter for crypto campaigns — only applies to school outreach
+        # Skip this filter for crypto/B2B campaigns — only applies to school outreach.
         if campaign_type == "school":
             EXCLUDED_KEYWORDS = [
+                # Original list
                 'surf school', 'flight school', 'preschool', 'pre-school', 'university',
                 'gym ', 'dance studio', 'martial arts', 'childcare', 'daycare', 'early learning',
                 'nursery', 'ballet school', 'yoga studio', 'tennis academy', 'soccer academy',
                 'swimming school', 'driving school', 'learning center', 'academy of art',
-                'beauty academy', 'kindergarten only'
+                'beauty academy', 'kindergarten only',
+                # Trade / vocational / adult-ed (added after live audit found
+                # bartending school, etc. slipping through and getting SAT-prep pitches)
+                'bartending school', 'bartender school', 'beauty school', 'beauty college',
+                'cosmetology', 'esthetician', 'esthetics school', 'massage school',
+                'massage therapy', 'real estate school', 'real estate academy',
+                'truck driving', 'cdl ', 'cdl school', 'trucking school',
+                'welding school', 'welding academy', 'auto repair school',
+                'mechanic school', 'culinary school', 'culinary academy', 'baking school',
+                'cooking school', 'nail school', 'nail academy', 'hair academy',
+                'barbering', 'barber school', 'hvac school', 'hvac academy',
+                'plumbing school', 'electrician school', 'trade school', 'trades school',
+                'vocational', 'continuing education', 'adult education', 'adult learning',
+                'gunsmith', 'firearms training', 'firearm', 'shooting school', 'shooting range',
+                'private investigator', 'security guard', 'security training',
+                'real estate agent', 'realty', 'mortgage school', 'tax school',
+                'phlebotomy', 'medical assistant school', 'cna school', 'nursing assistant',
+                'massage', 'aesthetic', 'spa academy',
+                'photography school', 'film school', 'recording school', 'music academy',
+                'dj school', 'dj academy', 'fitness academy', 'fitness school', 'pilates',
+                'kickboxing', 'cheerleading', 'dance academy',
+                'performing arts', 'voice studio', 'art studio', 'pottery',
+                'tutor', 'tutoring', 'kumon', 'mathnasium', 'sylvan', 'huntington',
             ]
-            # Only check school name, not role (avoid false positives like "College Counselor")
             school_name = (lead_data.get("school_name") or "").lower()
+            email = (lead_data.get("email") or "").lower()
 
-            if any(keyword in school_name for keyword in EXCLUDED_KEYWORDS):
-                self.logger.warning(f"🚫 [INSTITUTION GUARD] Skipping non-traditional lead: {full_text}")
+            matched = next((kw for kw in EXCLUDED_KEYWORDS if kw in school_name), None)
+            if matched:
+                self.logger.warning(
+                    f"🚫 [INSTITUTION GUARD] Skipping non-traditional lead "
+                    f"({email} @ {school_name!r}, matched: {matched!r})"
+                )
                 return {
                     "subject": "SKIP_LEAD",
-                    "body": "Validation Failed: Non-Traditional Institution (Not K-12 Middle/High School)"
+                    "body": f"Validation Failed: Non-Traditional Institution (matched '{matched}')"
                 }
 
         # --- 1. Identify Archetype ---
