@@ -282,12 +282,30 @@ class EmailGenerator:
                     f"⚠️ [HALLUCINATION] Retry also failed for {lead_data.get('email')}: {reason}. "
                     f"Falling back to raw template body."
                 )
-                # Strip any remaining template variables/placeholders from the raw template
+                # Build a clean subject by trying real subject_patterns from
+                # the campaign profile, then stripping any remaining template
+                # variables / unfilled placeholders from the body fallback.
+                fallback_subj = envelope.get("subject", "")
+                if "{{" in fallback_subj or not fallback_subj.strip() or fallback_subj.strip() == "Subject:":
+                    patterns = (getattr(self, "profile_config", {}) or {}).get("subject_patterns", [])
+                    company_name = lead_data.get("school_name") or lead_data.get("company_name") or ""
+                    pick = next((p for p in patterns if "{{" not in p), None) or "Quick question"
+                    if "{{ company_name }}" in pick and company_name:
+                        pick = pick.replace("{{ company_name }}", company_name)
+                    if "Quick question" in pick and company_name:
+                        pick = f"Quick question about {company_name}"
+                    fallback_subj = pick
+                # Strip remaining template variables / placeholders / leftover Subject line
                 fallback = self._TEMPLATE_VAR_RE.sub("", template_content or "").strip()
                 fallback = self._PLACEHOLDER_RE.sub("", fallback).strip()
+                fallback = re.sub(r"(?im)^\s*Subject:.*$\n?", "", fallback).strip()
+                # Drop any leading/trailing greeting/sign-off lines from the
+                # template since the envelope adds those back.
+                fallback = re.sub(r"^(?i)(?:Hi|Dear|Good|Hello|To the).*?,\s*\n+", "", fallback).strip()
+                # Collapse runs of double-spaces from removed placeholders
+                fallback = re.sub(r" {2,}", " ", fallback)
                 candidate = fallback
-                # Use envelope-derived subject so we still have a valid subject line
-                llm_result = {"subject": envelope.get("subject", "Quick question"), "body": candidate}
+                llm_result = {"subject": fallback_subj or "Quick question", "body": candidate}
         clean_body = candidate
         
         # FINAL PROTECTION: Ensure no "Hi [Name]" if we already have it in clean_body
