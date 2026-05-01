@@ -66,7 +66,8 @@ spawn_supervised "BAHAMAS_RETREAT" \
 #    Sender is now active, so push the scraper harder so the pool stays ahead.
 spawn_supervised "BAHAMAS_SCRAPER" \
   "$PYTHON_BIN" bahamas_daemon.py \
-    --auto-sync-sheets --max-per-city 40 --cities-per-cycle 4 --cycle-rest-min 30
+    --auto-sync-sheets --max-per-city 40 --cities-per-cycle 4 --cycle-rest-min 30 \
+    --sheet-name "Bahamas Retreat - Leads"
 
 log "All 3 daemons spawned. Waiting forever..."
 wait

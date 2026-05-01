@@ -537,12 +537,57 @@ class EmailScheduler:
         if not self.is_running:
             self.scheduler.start()
             self.is_running = True
+            # Mirror to stdout via print() so railway logs always show this,
+            # regardless of logger configuration / log-file routing.
+            profile_tag = self.profile_config.get("log_file", "?")
+            print(f"[SCHEDULER:{profile_tag}] 🚀 Email Scheduler Started (EST Timezone)", flush=True)
             self.logger.info("🚀 Email Scheduler Started (EST Timezone)")
             self._schedule_daily_runs()
-            
+
+            # Schedule a 5-minute heartbeat so we can prove the scheduler is alive.
+            self.scheduler.add_job(
+                self._heartbeat,
+                'interval',
+                minutes=5,
+                id='heartbeat',
+                replace_existing=True,
+                next_run_time=datetime.now(pytz.timezone('US/Eastern')) + timedelta(seconds=30),
+            )
+
             # Run immediate prep for first launch
+            print(f"[SCHEDULER:{profile_tag}] 📡 Triggering immediate queue preparation...", flush=True)
             self.logger.info("📡 Triggering immediate queue preparation...")
-            self._prepare_daily_queue()
+            try:
+                self._prepare_daily_queue()
+            except Exception as e:
+                import traceback
+                print(f"[SCHEDULER:{profile_tag}] ❌ _prepare_daily_queue CRASHED: {e}", flush=True)
+                print(traceback.format_exc(), flush=True)
+                self.logger.error(f"_prepare_daily_queue crashed: {e}", exc_info=True)
+
+    def _heartbeat(self):
+        """Periodic stdout heartbeat that proves the scheduler is alive and
+        shows queue depth so silent failures become visible."""
+        try:
+            profile_tag = self.profile_config.get("log_file", "?")
+            now_est = datetime.now(pytz.timezone('US/Eastern'))
+            jobs = self.scheduler.get_jobs()
+            slot_jobs = [j for j in jobs if j.id.startswith('slot_')]
+            upcoming = sorted([j for j in slot_jobs if j.next_run_time and j.next_run_time > now_est],
+                              key=lambda j: j.next_run_time)
+            past_due = [j for j in slot_jobs if j.next_run_time and j.next_run_time <= now_est]
+            today_key_prefix = now_est.strftime('%Y%m%d')
+            sent_today = sum(v for k, v in self._daily_send_counts.items() if k.endswith(f"_{today_key_prefix}"))
+            cache_size = len(self._lead_cache) if hasattr(self, '_lead_cache') else 0
+            next_str = upcoming[0].next_run_time.strftime('%H:%M:%S %Z') if upcoming else "(none)"
+            print(
+                f"[SCHEDULER:{profile_tag}] 💓 HEARTBEAT now={now_est.strftime('%H:%M:%S %Z')} "
+                f"slot_jobs={len(slot_jobs)} upcoming={len(upcoming)} past_due={len(past_due)} "
+                f"sent_today={sent_today} cache={cache_size} cap={self._daily_cap} next_slot={next_str}",
+                flush=True,
+            )
+        except Exception as e:
+            print(f"[SCHEDULER] ❌ heartbeat failed: {e}", flush=True)
     
     def stop(self):
         """Stop the scheduler"""
@@ -563,19 +608,22 @@ class EmailScheduler:
     
     def _prepare_daily_queue(self):
         """Prepare and queue all sends for the day"""
+        profile_tag = self.profile_config.get("log_file", "?")
+        print(f"[SCHEDULER:{profile_tag}] 📅 Starting daily queue preparation...", flush=True)
         self.logger.info("📅 Starting daily queue preparation...")
         now = datetime.now(pytz.timezone('US/Eastern'))
         day_of_week = now.weekday()
-        
+
         if day_of_week in [5, 6]:  # Weekend
             day_type = "weekend"
             inbox_count = self.config.INBOXES_PER_DAY_WEEKEND
         else:  # Business day
             day_type = "business"
             inbox_count = self.config.INBOXES_PER_DAY_BUSINESS
-        
+
         # Generate slots
         slots = self.generate_send_slots(day_type, inbox_count)
+        print(f"[SCHEDULER:{profile_tag}] 🎯 Generated {len(slots)} send slots for today ({day_type}).", flush=True)
         self.logger.info(f"🎯 Generated {len(slots)} send slots for today ({day_type}).")
         
         # Schedule each slot
@@ -594,11 +642,14 @@ class EmailScheduler:
     
     def _execute_slot(self, inbox_id, scheduled_time):
         """Execute a single send slot with sequence prioritization"""
+        profile_tag = self.profile_config.get("log_file", "?")
         # --- DAILY CAP ENFORCEMENT ---
         today_key = f"{inbox_id}_{datetime.now(pytz.timezone('US/Eastern')).strftime('%Y%m%d')}"
         current_count = self._daily_send_counts.get(today_key, 0)
         if current_count >= self._daily_cap:
-            return  # Silently skip — daily cap reached for this inbox
+            print(f"[SCHEDULER:{profile_tag}] ⏸️ slot capped: {inbox_id} ({current_count}/{self._daily_cap})", flush=True)
+            return  # daily cap reached for this inbox
+        print(f"[SCHEDULER:{profile_tag}] ⏰ SLOT FIRE inbox={inbox_id} count={current_count}/{self._daily_cap}", flush=True)
 
         # --- ANTI-PATTERN JITTER: Random 0-30 second delay ---
         time.sleep(random.uniform(0, 30))
@@ -623,19 +674,20 @@ class EmailScheduler:
             # --- GLOBAL SUPPRESSION CHECK ---
             lead_email = prospects[0].get('email')
             if self.suppression.is_suppressed(lead_email):
+                print(f"[SCHEDULER:{profile_tag}] 🚫 suppressed: {lead_email}", flush=True)
                 self.logger.warning(f"🚫 [DEDUPLICATION] Skipping {lead_email} - Already contacted globally.")
-                # Mark as duplicate in sheet to prevent future slot waste
                 try:
                     self.sheets.update_lead_status(lead_email, "duplicate")
                 except:
                     pass
                 return
 
+            print(f"[SCHEDULER:{profile_tag}] 📨 sending stage {stage} → {lead_email} via {inbox_id}", flush=True)
             self.logger.info(f"⏰ [SLOT FIRE] Executing Stage {stage} send for {prospects[0].get('email')} from inbox {inbox_id}")
             self.execute_send(inbox_id, prospects, sequence_number=stage)
         else:
-             # self.logger.debug(f"🔇 [SLOT FIRE] No prospects (Stage 1 or 2) found for inbox {inbox_id} at {scheduled_time}")
-             pass
+            # No prospects in either stage — surface the reason instead of silently dropping.
+            print(f"[SCHEDULER:{profile_tag}] 🔇 slot fired but NO prospects available (cache_size={len(self._lead_cache)}, cache_dry={getattr(self, '_cache_dry', '?')})", flush=True)
 
     def log_upcoming_sends(self, limit=5):
         """Prints the next N scheduled sends to the log for visibility."""

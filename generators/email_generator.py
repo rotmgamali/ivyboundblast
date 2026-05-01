@@ -117,9 +117,13 @@ class EmailGenerator:
         url = lead_data.get("website") or lead_data.get("domain")
 
         # --- Personalization Floor ---
-        # Generic catch-all addresses (info@, contact@, hello@, etc.) carry zero
-        # personal data. Sending a "hyper-personalized" pitch to them produces
-        # a generic email branded as personal — worst of both worlds. Skip them.
+        # For SCHOOL campaigns: skip catch-all addresses (info@, contact@, hello@)
+        # with no first_name and no real title — sending a "hyper-personalized"
+        # pitch to them produces a generic email branded as personal.
+        # For B2B campaigns: catch-alls are unavoidable (executives hide their
+        # real emails). The b2b scraper extracts rich company context (services,
+        # founded year, leadership) so even a "Hi {company} team," email has
+        # genuine personalization — let it through.
         local_part = email.split("@", 1)[0].lower() if "@" in email else ""
         first_name = (lead_data.get("first_name") or "").strip()
         raw_title = (lead_data.get("title") or lead_data.get("role") or "").strip()
@@ -129,9 +133,14 @@ class EmailGenerator:
             "inquiries", "enquiries", "general", "mail", "email", "hi", "ask",
             "sales", "marketing", "press", "media", "service", "services",
         }
-        if local_part in CATCH_ALL_PREFIXES and not first_name and not title:
+        if (
+            campaign_type == "school"
+            and local_part in CATCH_ALL_PREFIXES
+            and not first_name
+            and not title
+        ):
             self.logger.warning(
-                f"🚫 [PERSONALIZATION FLOOR] Skipping catch-all lead with no name/title: {email} (raw_title='{raw_title}')"
+                f"🚫 [PERSONALIZATION FLOOR] Skipping catch-all school lead with no name/title: {email} (raw_title='{raw_title}')"
             )
             return {
                 "subject": "SKIP_LEAD",
