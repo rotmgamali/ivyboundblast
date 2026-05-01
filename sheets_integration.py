@@ -698,17 +698,26 @@ class GoogleSheetsClient:
                         # Fallback: if we still don't have a lead, but it's clearly a reply to us
                         # we still log it as 'Neutral' sender in log_reply (already handled by defaults)
 
-        # Make sure the new Intent + Suggested Reply columns exist on the
-        # live sheet (it may pre-date this schema). Idempotent: only writes
-        # if those header cells are blank.
+        # Build a row aligned to the LIVE header order. The replies sheet
+        # may have older columns ("Actionability") that aren't in our base
+        # schema — we want to leave those alone, not overwrite them. So we
+        # look up each value by header name and append a row that matches
+        # the current header order exactly. Missing columns (like "Intent"
+        # / "Suggested Reply") get added at the end of the header row first.
         try:
             current_headers = worksheet.row_values(1)
-            if len(current_headers) < 14 or (current_headers[13] if len(current_headers) > 13 else '') != "Intent":
-                worksheet.update_cell(1, 14, "Intent")
-            if len(current_headers) < 15 or (current_headers[14] if len(current_headers) > 14 else '') != "Suggested Reply":
-                worksheet.update_cell(1, 15, "Suggested Reply")
         except Exception as e:
-            logger.warning(f"Could not ensure Intent/Suggested Reply headers: {e}")
+            logger.warning(f"Could not read replies sheet headers: {e}")
+            current_headers = []
+
+        for col_name in ("Intent", "Suggested Reply"):
+            if col_name not in current_headers:
+                next_col = len(current_headers) + 1
+                try:
+                    worksheet.update_cell(1, next_col, col_name)
+                    current_headers.append(col_name)
+                except Exception as e:
+                    logger.warning(f"Could not add header {col_name!r}: {e}")
 
         # Use snippet from upstream parser if present, else fall back to entire_thread
         body_text = (
@@ -717,23 +726,26 @@ class GoogleSheetsClient:
             or reply_data.get('entire_thread', '')
         )
 
-        row = [
-            reply_data.get('received_at', datetime.now().isoformat()),
-            from_email,
-            reply_data.get('from_name', ''),
-            school_name,
-            role,
-            reply_data.get('subject', ''),
-            body_text,
-            reply_data.get('sentiment', 'neutral'),
-            reply_data.get('original_sender', ''),
-            reply_data.get('original_subject', ''),
-            reply_data.get('thread_id', ''),
-            reply_data.get('action_taken', ''),
-            reply_data.get('notes', ''),
-            reply_data.get('intent', 'UNCLEAR'),
-            reply_data.get('suggested_reply', ''),
-        ]
+        # Map header name -> value
+        value_by_header = {
+            "Received At": reply_data.get('received_at', datetime.now().isoformat()),
+            "From Email": from_email,
+            "From Name": reply_data.get('from_name', ''),
+            "School Name": school_name,
+            "Role": role,
+            "Subject": reply_data.get('subject', ''),
+            "Entire Thread": body_text,
+            "Sentiment": reply_data.get('sentiment', 'neutral'),
+            "Original Sender": reply_data.get('original_sender', ''),
+            "Original Subject": reply_data.get('original_subject', ''),
+            "Thread ID": reply_data.get('thread_id', ''),
+            "Action Taken": reply_data.get('action_taken', ''),
+            "Notes": reply_data.get('notes', ''),
+            "Intent": reply_data.get('intent', 'UNCLEAR'),
+            "Suggested Reply": reply_data.get('suggested_reply', ''),
+        }
+        # Build row in header order; unknown columns (e.g. "Actionability") get blank
+        row = [value_by_header.get(h, '') for h in current_headers]
 
         worksheet.append_row(row, value_input_option='USER_ENTERED')
         logger.info(f"Logged reply from {from_email}")
