@@ -75,6 +75,7 @@ class ReplyWatcher:
                     
         self.sheets_client = GoogleSheetsClient(
             input_sheet_name=profile_config["input_sheet"],
+            input_worksheet_name=profile_config.get("input_worksheet"),
             replies_sheet_name=profile_config["replies_sheet"],
             replies_sheet_id=profile_config.get("replies_sheet_id"),
             replies_worksheet_name=getattr(self.config, "ACTIVE_REPLIES_WORKSHEET", None)
@@ -126,10 +127,18 @@ class ReplyWatcher:
             logger.error(f"❌ [WATCHER] Failed to load campaign inboxes: {e}")
 
     def _load_lead_emails(self):
-        """Loads all lead emails and domains from the current profile's input sheet."""
+        """Loads all lead emails and domains from the current profile's input sheet/tab.
+
+        Uses the profile's configured input_worksheet (e.g. "Bahamas Retreat - Leads"
+        for BAHAMAS_RETREAT) instead of always reading sheet1, which previously
+        caused the Bahamas reply watcher to load Ivybound leads and miss every
+        real Bahamas reply via the lead-first filter.
+        """
         try:
             logger.info(f"📋 [WATCHER] Loading lead list for {self.profile_name} to guarantee no missed replies...")
-            records = self.sheets_client.input_sheet.sheet1.get_all_records()
+            ws = self.sheets_client._input_worksheet()
+            records = ws.get_all_records()
+            tab_label = self.sheets_client.input_worksheet_name or "sheet1"
             for r in records:
                 email = str(r.get('email', '')).lower().strip()
                 if email:
@@ -138,7 +147,10 @@ class ReplyWatcher:
                         domain = email.split('@')[-1]
                         if domain not in self.generic_domains:
                             self.lead_domains.add(domain)
-            logger.info(f"✅ [WATCHER] Loaded {len(self.lead_emails)} lead emails and {len(self.lead_domains)} lead domains.")
+            logger.info(
+                f"✅ [WATCHER] Loaded {len(self.lead_emails)} lead emails and "
+                f"{len(self.lead_domains)} lead domains from tab {tab_label!r}."
+            )
         except Exception as e:
             logger.error(f"❌ [WATCHER] Failed to load lead list: {e}")
         
@@ -287,36 +299,54 @@ class ReplyWatcher:
                     if is_known_lead:
                         logger.info(f"📬 [LEAD REPLY] Accepting reply from known lead: {from_email} — Subject: {subject}")
                     else:
-                        # NON-LEAD: Apply strict subject + inbox filtering
-                        
-                        # FILTER 2: Subject fragment matching
-                        reply_subject = subject.lower().replace('re:', '').replace('fwd:', '').strip()
-                        known_fragments = [
-                            "quick question", "supporting families", "boosting enrollment", 
-                            "academic outcomes", "differentiation", "merit scholarship",
-                            "college readiness", "student-athletes", "test prep", 
-                            "enhancing value", "families and college prep"
-                        ]
-                        if not any(frag in reply_subject for frag in known_fragments):
-                            logger.debug(f"⏭️ [SKIP] Non-lead subject didn't match campaign fragments: {subject}")
-                            continue
-
-                        # FILTER 3: Inbox partition (only for non-leads)
+                        # NON-LEAD: Apply inbox-partition + profile-aware subject filtering.
+                        # Note: this path mostly catches replies from forwarded recipients
+                        # ("a colleague replied") whose email isn't in our lead sheet.
+                        #
+                        # FILTER A: Inbox partition — must land in a campaign inbox.
                         to_email = msg.get("to")[0] if msg.get("to") else "unknown"
                         if self.campaign_inboxes and to_email.lower().strip() not in self.campaign_inboxes:
                             logger.debug(f"⏭️ [SKIP] Non-lead reply to {to_email} — not in {self.profile_name} partition")
                             continue
 
-                        # FILTER 4: Subject pattern matching (only for non-leads)
+                        # FILTER B: Subject must match the profile's own subject_patterns
+                        # OR (for school campaigns) one of the legacy free-text fragments.
                         profile_config = automation_config.CAMPAIGN_PROFILES[self.profile_name]
                         subject_patterns = profile_config.get("subject_patterns", [])
-                        
-                        if subject_patterns:
-                            clean_subject = re.sub(r'^(Re|Fwd|RE|FWD):\s*', '', subject, flags=re.IGNORECASE).strip()
-                            matches_pattern = any(clean_subject.lower().startswith(p.lower()) for p in subject_patterns)
-                            if not matches_pattern:
-                                logger.debug(f"⏭️ [SKIP] Non-lead subject pattern mismatch: '{subject}'")
-                                continue
+                        clean_subject = re.sub(r'^(Re|Fwd|RE|FWD):\s*', '', subject, flags=re.IGNORECASE).strip().lower()
+
+                        # Treat profile subject_patterns as substring matches (not just startswith)
+                        # so dynamic patterns like "Quick question about X" / "Retreats for Y"
+                        # / "{{ company_name }}" all match. Strip template placeholders.
+                        pattern_strs = [
+                            re.sub(r"\{\{[^}]+\}\}", "", p).strip().lower()
+                            for p in subject_patterns
+                        ]
+                        pattern_strs = [p for p in pattern_strs if len(p) >= 4]
+                        matches_profile = any(p in clean_subject for p in pattern_strs)
+
+                        # Legacy fragments (school-era) — kept for backward compat with
+                        # IVYBOUND replies still arriving from older subject lines.
+                        legacy_fragments = [
+                            "quick question", "supporting families", "boosting enrollment",
+                            "academic outcomes", "differentiation", "merit scholarship",
+                            "college readiness", "student-athletes", "test prep",
+                            "enhancing value", "families and college prep",
+                        ]
+                        matches_legacy = any(frag in clean_subject for frag in legacy_fragments)
+
+                        # B2B / Bahamas-style heuristic: "retreat", "villa", "offsite",
+                        # "team event", "private property" — natural-language matches
+                        # to anything that looks like a hospitality/retreat reply.
+                        b2b_fragments = [
+                            "retreat", "villa", "offsite", "team event",
+                            "private property", "bahamas", "executive offsite",
+                        ]
+                        matches_b2b = any(frag in clean_subject for frag in b2b_fragments)
+
+                        if not (matches_profile or matches_legacy or matches_b2b):
+                            logger.debug(f"⏭️ [SKIP] Non-lead subject didn't match profile/legacy/b2b fragments: {subject!r}")
+                            continue
 
                     # Normalize keys for the rest of the script
                     msg["from_email"] = msg.get("from_email")
