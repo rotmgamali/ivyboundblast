@@ -626,19 +626,33 @@ class GoogleSheetsClient:
         from_email = str(reply_data.get('from_email', '')).lower().strip()
         received_at = str(reply_data.get('received_at', ''))
         subject = str(reply_data.get('subject', '')).strip()
+        thread_id = str(reply_data.get('thread_id', '')).strip()
 
         # --- DUPLICATE CHECK ---
-        # Fetch existing to compare. Optimization: Cache for 60s
-        now = time.time()
-        if not hasattr(self, '_replies_cache') or not hasattr(self, '_replies_cache_time') or (now - self._replies_cache_time > 60):
-            self._replies_cache = worksheet.get_all_records()
-            self._replies_cache_time = now
-            
-        for r in self._replies_cache:
-            if str(r.get('From Email', '')).lower().strip() == from_email and \
-               str(r.get('Received At', '')) == received_at and \
-               str(r.get('Subject', '')).strip() == subject:
-                logger.info(f"⏭️ [DUPE] Already logged reply from {from_email}")
+        # Read fresh every call. The previous 60s cache caused massive
+        # duplication: with two profile reply-watchers polling and multiple
+        # redeploys per day, both watchers + each fresh process would see
+        # an empty cache and re-log the same reply. Result was 747 dupe
+        # rows accumulated. Fresh reads cost ~1 extra API call per logged
+        # reply but make dedup correct.
+        try:
+            existing_rows = worksheet.get_all_records()
+        except Exception as e:
+            logger.warning(f"Could not fetch replies for dedup: {e}; proceeding without dedup")
+            existing_rows = []
+
+        for r in existing_rows:
+            # Strongest key: Thread ID (when both sides have it)
+            if thread_id and str(r.get('Thread ID', '')).strip() == thread_id:
+                logger.info(f"⏭️ [DUPE] Already logged reply by thread_id={thread_id} from {from_email}")
+                return False
+            # Fallback key: From + Received At + Subject (catches msgs without thread_id)
+            if (
+                str(r.get('From Email', '')).lower().strip() == from_email
+                and str(r.get('Received At', '')) == received_at
+                and str(r.get('Subject', '')).strip() == subject
+            ):
+                logger.info(f"⏭️ [DUPE] Already logged reply from {from_email} (subject match)")
                 return False
         
         # --- AUTO-ENRICHMENT ---
