@@ -147,11 +147,24 @@ class EmailScheduler:
             # Sort by ID to ensure consistent rotation order
             all_inboxes_raw.sort(key=lambda x: x['id'])
             
-            # HARDENING: Filter inboxes based on profile server_filter or indices
+            # HARDENING: Filter inboxes by server_filter, then optionally by
+            # domain_whitelist (so we can split a single server's mailboxes
+            # across two campaigns by domain).
             server_filter = self.profile_config.get("server_filter")
+            domain_whitelist = self.profile_config.get("domain_whitelist") or []
             if server_filter:
                 all_inboxes = [i for i in all_inboxes_raw if i.get('server') == server_filter]
-                self.logger.info(f"🛡️ [HARDENING] Server filter: Using {server_filter} (Total: {len(all_inboxes)} inboxes)")
+                if domain_whitelist:
+                    wl = set(domain_whitelist)
+                    all_inboxes = [i for i in all_inboxes if i.get('domain') in wl]
+                    self.logger.info(
+                        f"🛡️ [HARDENING] Server={server_filter}, domain whitelist={len(wl)} domains "
+                        f"({len(all_inboxes)} inboxes)"
+                    )
+                else:
+                    self.logger.info(
+                        f"🛡️ [HARDENING] Server filter: Using {server_filter} (Total: {len(all_inboxes)} inboxes)"
+                    )
             else:
                 start_idx, end_idx = self.profile_config.get("inbox_indices", (0, 9999))
                 all_inboxes = all_inboxes_raw[start_idx:end_idx]

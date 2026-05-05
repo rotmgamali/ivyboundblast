@@ -163,7 +163,6 @@ CAMPAIGN_PROFILES = {
         "replies_sheet": "Ivy Bound - Reply Tracking",
         "replies_sheet_id": "1jeLkdufaMub4rylaPnoTQZwDiLpHmut5hcQQStl8UxI",
         "send_window_group": "default",
-        "inbox_indices": (0, 88),  # All truckice inboxes
         "log_file": "ivybound_summer.log",
         "templates_dir": "templates/school_summer",  # Summer-angled templates
         "campaign_type": "school",
@@ -177,12 +176,22 @@ CAMPAIGN_PROFILES = {
             "Summer SAT prep at private-school pricing",
             "A no-cost resource for your families this summer",
         ],
-        "server_filter": "truckice",
-        # Stage-2 follow-ups DISABLED 2026-05-05. The March cohort's lack
-        # of engagement is the strongest negative signal Gmail has against
-        # truckice domains. Re-engaging those exact recipients with another
-        # email accelerates reputation decay. Stage-1 fresh leads only
-        # until truckice domain reputation rebuilds.
+        # Migrated from truckice to competitionhand 2026-05-05. Truckice
+        # domains were burned by the March campaign (1/3 to Spam, 2/3 not
+        # delivered in live test). Competitionhand domains are clean
+        # (3/3 to Inbox in same test). Split competitionhand 10/10 by
+        # domain so each campaign has its own per-domain reputation.
+        "server_filter": "competitionhand",
+        "domain_whitelist": [
+            "agentsdirect.online", "airagents.online", "airagentsdirect.online",
+            "airdirect.online", "directai.online", "infoweb5.online",
+            "mailboxai.online", "web4devs.online", "web4direct.online",
+            "web4genius.online",
+        ],
+        # Stage-2 follow-ups DISABLED 2026-05-05. Even on fresh
+        # competitionhand domains, re-engaging the March cohort (who
+        # already didn't open the IV email then) is poor use of the new
+        # reputation budget. Stage-1 fresh leads only.
         "disable_followups": True,
         "archetypes": {
             "head_of_school": ["head of school", "headmaster", "headmistress", "president", "executive director", "superintendent"],
@@ -199,7 +208,6 @@ CAMPAIGN_PROFILES = {
         "input_worksheet": "Bahamas Retreat - Leads",
         "replies_sheet": "Ivy Bound - Reply Tracking",
         "send_window_group": "default",
-        "inbox_indices": (0, 80),  # All competitionhand inboxes
         "log_file": "bahamas_retreat.log",
         "templates_dir": "templates/bahamas",
         "campaign_type": "b2b",
@@ -210,7 +218,16 @@ CAMPAIGN_PROFILES = {
             "team retreat",
             "{{ company_name }}",
         ],
+        # Split competitionhand 10/10 with IVYBOUND_SUMMER. Bahamas keeps
+        # the second half of domains so each campaign builds its own
+        # per-domain reputation cleanly (no mixed content per domain).
         "server_filter": "competitionhand",
+        "domain_whitelist": [
+            "web4guru.online", "web4help.online", "web4info.online",
+            "web4outreach.online", "web5devs.online", "web5direct.online",
+            "web5guru.online", "web5help.online", "web5info.online",
+            "web5outreach.online",
+        ],
         "sender_identities_override": "BAHAMAS_SENDER_IDENTITIES",
         "system_prompt_template": (
             "You are {sender_name} from SerenitySpaces Bahamas, a private 4-villa luxury retreat property "
