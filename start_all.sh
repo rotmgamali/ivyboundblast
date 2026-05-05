@@ -55,12 +55,14 @@ log "Workdir: $(pwd)"
 spawn_supervised "IVYBOUND_SUMMER" \
   "$PYTHON_BIN" mailreef_automation/main.py --profile IVYBOUND_SUMMER
 
-# 2. Bahamas Retreat email sender (competitionhand, 84 inboxes).
-#    User decision (2026-04-30): use the existing competitionhand inboxes
-#    (web4guru.online / agentsdirect.online / airagents.online) for the
-#    Bahamas pitch even though the domains aren't Bahamas-branded.
-spawn_supervised "BAHAMAS_RETREAT" \
-  "$PYTHON_BIN" mailreef_automation/main.py --profile BAHAMAS_RETREAT
+# 2. Bahamas Retreat email sender — PAUSED 2026-05-05.
+#    Diagnosis after 4 days / 1,285 sends / 0 real replies: brand mismatch
+#    (SerenitySpaces Bahamas pitch from web4guru/agentsdirect/airagents
+#    domains) is almost certainly causing spam-folder placement at Gmail/
+#    Outlook. We already received 1 hard spam complaint on Day 1.
+#    Restart only after Bahamas-branded domains are provisioned in Mailreef.
+# spawn_supervised "BAHAMAS_RETREAT" \
+#   "$PYTHON_BIN" mailreef_automation/main.py --profile BAHAMAS_RETREAT
 
 # 3. Bahamas executive scraper daemon (24/7).
 #    Sender is now active, so push the scraper harder so the pool stays ahead.

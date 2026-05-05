@@ -25,10 +25,14 @@ EMAILS_PER_INBOX_DAY_WEEKEND = 3    # Static fallback. The live cap comes from g
 # ==================== WEEKLY RAMP (auto-escalating) ====================
 # Set when the senders went live on Railway. Override via the
 # CAMPAIGN_START_DATE env var to reset / pause the ramp.
-CAMPAIGN_START_DATE = os.environ.get("CAMPAIGN_START_DATE", "2026-04-30")
-# Per-inbox/day for week 1, 2, 3, 4+. Stays at index 3 after week 4.
-WEEKLY_RAMP_BUSINESS = [5, 10, 15, 20]
-WEEKLY_RAMP_WEEKEND = [3, 5, 7, 10]
+# Reset 2026-05-05 to slow-warm cold domains. After 4 days at 5/inbox/day
+# we hit 0 replies on 2,794 sends — strong signal of spam-folder placement.
+# Slow ramp lets reputation rebuild via Smartlead warmup before pushing
+# cold-outreach volume back up.
+CAMPAIGN_START_DATE = os.environ.get("CAMPAIGN_START_DATE", "2026-05-05")
+# Per-inbox/day for week 1, 2, 3, 4+. Conservative ramp: start at 1.
+WEEKLY_RAMP_BUSINESS = [1, 2, 3, 5]
+WEEKLY_RAMP_WEEKEND = [1, 1, 2, 3]
 
 
 def get_current_ramp_caps(today=None):
@@ -100,8 +104,14 @@ CAMPAIGN_CONFIG = {
 }
 
 # ==================== CAN-SPAM COMPLIANCE ====================
-PHYSICAL_ADDRESS = "Ivybound Education Partners, PO Box [TO BE SET]"  # User must set real address
-UNSUBSCRIBE_MAILTO = "unsubscribe@web4guru.com"
+# CAN-SPAM compliance footer. Real values required — leaked placeholders
+# are spam-filter triggers AND look unprofessional to recipients.
+# YOU MUST set PHYSICAL_ADDRESS and UNSUBSCRIBE_MAILTO via Railway env vars
+# to your real business address and unsubscribe mailbox before re-launching.
+# Until then, the footer is suppressed entirely (see scheduler.py emit logic
+# which only renders the footer when both values are non-empty).
+PHYSICAL_ADDRESS = os.environ.get("PHYSICAL_ADDRESS", "")
+UNSUBSCRIBE_MAILTO = os.environ.get("UNSUBSCRIBE_MAILTO", "")
 MAX_DAILY_SENDS_PER_INBOX = 5  # WEEK 1 cap. Bump to 10 (week 2), 15 (week 3), 20 (week 4+)
 
 # ==================== DELIVERABILITY THRESHOLDS ====================
