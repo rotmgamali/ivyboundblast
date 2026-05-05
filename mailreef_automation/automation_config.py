@@ -167,13 +167,23 @@ CAMPAIGN_PROFILES = {
         "log_file": "ivybound_summer.log",
         "templates_dir": "templates/school_summer",  # Summer-angled templates
         "campaign_type": "school",
+        # Subject patterns — dropped "Quick question about" after 2026-05-05
+        # deliverability test: that subject is a known top-tier spam trigger
+        # at Gmail/Outlook ML and likely contributed to truckice domain
+        # reputation damage from the March campaign.
         "subject_patterns": [
-            "Quick question about",
-            "summer enrichment",
-            "summer slide",
-            "summer SAT",
+            "Summer enrichment for {{ school_name }}",
+            "{{ school_name }} families and college prep",
+            "Summer SAT prep at private-school pricing",
+            "A no-cost resource for your families this summer",
         ],
         "server_filter": "truckice",
+        # Stage-2 follow-ups DISABLED 2026-05-05. The March cohort's lack
+        # of engagement is the strongest negative signal Gmail has against
+        # truckice domains. Re-engaging those exact recipients with another
+        # email accelerates reputation decay. Stage-1 fresh leads only
+        # until truckice domain reputation rebuilds.
+        "disable_followups": True,
         "archetypes": {
             "head_of_school": ["head of school", "headmaster", "headmistress", "president", "executive director", "superintendent"],
             "principal": ["principal", "assistant principal", "vice principal"],

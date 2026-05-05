@@ -655,18 +655,20 @@ class EmailScheduler:
         time.sleep(random.uniform(0, 30))
 
         # Check if follow-ups are enabled (sequence_length > 1)
+        # AND not explicitly disabled per-profile (deliverability override).
         seq_len = self.config.CAMPAIGN_CONFIG.get("sequence_length", 2)
-        
+        followups_disabled = bool(self.profile_config.get("disable_followups"))
+
         prospects = None
         stage = 1
-        
-        if seq_len > 1:
+
+        if seq_len > 1 and not followups_disabled:
             # Prioritize Follow-ups (Stage 2) first
             prospects = self.select_prospects_for_send(inbox_id, count=1, sequence_stage=2)
             stage = 2
-        
+
         if not prospects:
-            # Pick a new Stage 1 lead (or the only stage when sequence_length=1)
+            # Pick a new Stage 1 lead (or the only stage when stage-2 is off)
             prospects = self.select_prospects_for_send(inbox_id, count=1, sequence_stage=1)
             stage = 1
         
