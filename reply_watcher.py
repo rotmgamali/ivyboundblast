@@ -192,15 +192,54 @@ class ReplyWatcher:
                 return False
 
         subj_lower = subject.lower() if subject else ""
-        
-        # 0. SUBJECT-MATCH PRIORITY (The "Inverse" filter)
+
+        # 0a. SENDER-DOMAIN BLOCKLIST for warmup pool networks.
+        # Manual audit on 2026-05-11 of 176 inbound msgs found 40 warmup
+        # senders our subject-pattern filter missed because the warmup
+        # subjects look natural ("RE: Annual Company Retreat", "RE: HR
+        # Policy Update", etc). All shared a sender-domain pattern that
+        # AI-generates new domains for the warmup pool — block by domain.
+        sender_domain = (from_email.split("@", 1)[1].lower() if "@" in email_clean else "")
+        WARMUP_SENDER_DOMAIN_PATTERNS = (
+            # Domain substrings that indicate warmup-pool participation.
+            "neexa",                        # neexanow, neexapulse, neexaflow, neexacloud, neexacenter, etc.
+            "kodexo",                       # kodexolabs.info, kodexolabsconsulting.pro, etc.
+            "-glow-media-gmbh",             # use-glow-media-gmbh.com, meine-glow-media-gmbh.biz
+            "the-united-capital",           # the-united-capital-sourcepartner.com etc.
+            "apply-united-capital",
+            "back-swing-golf-events",
+            "cleeai.app",
+            "tryeatlovepro",
+            "revcognition.org",
+            "curious-about-sales",
+            "ai-i-f-i-y-u",
+            "verifiedcontactdata",          # rebeccatorres@verifiedcontactdata.info — already in old logs
+            "leadgatewayonline",
+            "useimpruveai",
+            "userevstac",
+            "navreoscaling",
+            "yourcalloperatorai",
+            "experienceinsight.cloud",
+            "tryelyosai",
+            "growwithaiark",
+            "aiarkgrowlab",
+            "kodexosupport",
+        )
+        for pat in WARMUP_SENDER_DOMAIN_PATTERNS:
+            if pat in sender_domain:
+                logger.debug(f"🗑️ [FILTER] Filtered as warmup (sender domain pattern '{pat}'): {from_email}")
+                return True
+
+        # 0b. SUBJECT-MATCH PRIORITY (The "Inverse" filter)
         # If the subject contains one of OUR phrases, it's almost certainly a real reply.
         # We bypass all bot filtering in this case.
         profile_config = self.config.CAMPAIGN_PROFILES.get(self.profile_name, {})
         known_patterns = profile_config.get("subject_patterns", [])
         for p in known_patterns:
-            if p.lower() in subj_lower:
-                logger.info(f"🎯 [MATCH] Confirmed real reply via subject match: '{p}'")
+            # Strip {{ ... }} placeholders before substring match
+            p_clean = re.sub(r"\{\{[^}]+\}\}", "", p).strip().lower()
+            if p_clean and len(p_clean) >= 4 and p_clean in subj_lower:
+                logger.info(f"🎯 [MATCH] Confirmed real reply via subject match: '{p_clean}'")
                 return False
 
         # 1. Subject Warmup patterns
@@ -309,15 +348,20 @@ class ReplyWatcher:
                             logger.debug(f"⏭️ [SKIP] Non-lead reply to {to_email} — not in {self.profile_name} partition")
                             continue
 
-                        # FILTER B: Subject must match the profile's own subject_patterns
-                        # OR (for school campaigns) one of the legacy free-text fragments.
-                        profile_config = automation_config.CAMPAIGN_PROFILES[self.profile_name]
-                        subject_patterns = profile_config.get("subject_patterns", [])
+                        # FILTER B: Subject must look like a reply to something we sent.
+                        # Trust "Re:" / "Fwd:" prefix as the strongest signal — by
+                        # definition that's a reply to something. The inbox-partition
+                        # filter above ensures it landed in OUR mailbox, and the
+                        # warmup filter is_warmup() already rejected warmup pool
+                        # senders (including the now-blocked sender-domain list).
+                        # 2026-05-11: previously this required the subject to match
+                        # narrow keyword lists ("retreat", "villa") and missed real
+                        # replies like "RE: A Unique Setting for Adaptive Computing".
+                        re_prefix_match = re.match(r'^\s*(Re|Fwd|RE|FWD)\s*:', subject, flags=re.IGNORECASE)
                         clean_subject = re.sub(r'^(Re|Fwd|RE|FWD):\s*', '', subject, flags=re.IGNORECASE).strip().lower()
 
-                        # Treat profile subject_patterns as substring matches (not just startswith)
-                        # so dynamic patterns like "Quick question about X" / "Retreats for Y"
-                        # / "{{ company_name }}" all match. Strip template placeholders.
+                        profile_config = automation_config.CAMPAIGN_PROFILES[self.profile_name]
+                        subject_patterns = profile_config.get("subject_patterns", [])
                         pattern_strs = [
                             re.sub(r"\{\{[^}]+\}\}", "", p).strip().lower()
                             for p in subject_patterns
@@ -325,27 +369,14 @@ class ReplyWatcher:
                         pattern_strs = [p for p in pattern_strs if len(p) >= 4]
                         matches_profile = any(p in clean_subject for p in pattern_strs)
 
-                        # Legacy fragments (school-era) — kept for backward compat with
-                        # IVYBOUND replies still arriving from older subject lines.
-                        legacy_fragments = [
-                            "quick question", "supporting families", "boosting enrollment",
-                            "academic outcomes", "differentiation", "merit scholarship",
-                            "college readiness", "student-athletes", "test prep",
-                            "enhancing value", "families and college prep",
-                        ]
-                        matches_legacy = any(frag in clean_subject for frag in legacy_fragments)
-
-                        # B2B / Bahamas-style heuristic: "retreat", "villa", "offsite",
-                        # "team event", "private property" — natural-language matches
-                        # to anything that looks like a hospitality/retreat reply.
-                        b2b_fragments = [
-                            "retreat", "villa", "offsite", "team event",
-                            "private property", "bahamas", "executive offsite",
-                        ]
-                        matches_b2b = any(frag in clean_subject for frag in b2b_fragments)
-
-                        if not (matches_profile or matches_legacy or matches_b2b):
-                            logger.debug(f"⏭️ [SKIP] Non-lead subject didn't match profile/legacy/b2b fragments: {subject!r}")
+                        # Accept the reply if any of:
+                        #  - subject starts with Re:/Fwd: (definitionally a reply)
+                        #  - subject substring-matches one of our profile's patterns
+                        # No more legacy/b2b keyword whitelists — they were too narrow
+                        # and dropped real replies whose subjects didn't include the
+                        # exact words we picked.
+                        if not (re_prefix_match or matches_profile):
+                            logger.debug(f"⏭️ [SKIP] Non-lead reply, no Re: prefix and no profile-pattern match: {subject!r}")
                             continue
 
                     # Normalize keys for the rest of the script
