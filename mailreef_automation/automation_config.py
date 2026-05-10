@@ -218,16 +218,10 @@ CAMPAIGN_PROFILES = {
             "team retreat",
             "{{ company_name }}",
         ],
-        # Split competitionhand 10/10 with IVYBOUND_SUMMER. Bahamas keeps
-        # the second half of domains so each campaign builds its own
-        # per-domain reputation cleanly (no mixed content per domain).
+        # 2026-05-10: All 84 competitionhand inboxes assigned to Bahamas
+        # (IVYBOUND_SUMMER paused per user priority). domain_whitelist
+        # removed so server_filter alone admits the full set.
         "server_filter": "competitionhand",
-        "domain_whitelist": [
-            "web4guru.online", "web4help.online", "web4info.online",
-            "web4outreach.online", "web5devs.online", "web5direct.online",
-            "web5guru.online", "web5help.online", "web5info.online",
-            "web5outreach.online",
-        ],
         "sender_identities_override": "BAHAMAS_SENDER_IDENTITIES",
         "system_prompt_template": (
             "You are {sender_name} from SerenitySpaces Bahamas, a private 4-villa luxury retreat property "
