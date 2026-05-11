@@ -51,12 +51,13 @@ log "${GREEN}========================================${RESET}"
 log "Python:  $($PYTHON_BIN --version 2>&1)"
 log "Workdir: $(pwd)"
 
-# 1. Ivybound Summer email sender — PAUSED 2026-05-10.
-#    User priority is Bahamas. All competitionhand inboxes redirected to BAH.
-#    Truckice still idle (burned domain rep from March). IV restart only when
-#    user explicitly says so.
-# spawn_supervised "IVYBOUND_SUMMER" \
-#   "$PYTHON_BIN" mailreef_automation/main.py --profile IVYBOUND_SUMMER
+# 1. Ivybound Summer email sender (truckice, 88 inboxes, capped at 2/day).
+#    2026-05-11: User wants max volume across both servers. IV is back on
+#    truckice at a static 2/inbox/day (via profile daily_cap_override).
+#    Truckice is burned (~33% delivery rate) but at low volume the asset
+#    still produces some IV stage-1 sends without further damaging rep.
+spawn_supervised "IVYBOUND_SUMMER" \
+  "$PYTHON_BIN" mailreef_automation/main.py --profile IVYBOUND_SUMMER
 
 # 2. Bahamas Retreat email sender (competitionhand, 84 inboxes).
 #    UN-PAUSED 2026-05-05 after live deliverability test: 3/3 test emails
@@ -67,12 +68,15 @@ log "Workdir: $(pwd)"
 spawn_supervised "BAHAMAS_RETREAT" \
   "$PYTHON_BIN" mailreef_automation/main.py --profile BAHAMAS_RETREAT
 
-# 3. Bahamas executive scraper daemon (24/7).
-#    Sender is now active, so push the scraper harder so the pool stays ahead.
+# 3. Apollo-fed scraper (24/7). REPLACED 2026-05-11.
+#    Old bahamas_daemon used Google Maps + 37 FL cities → ceiling ~1,500
+#    businesses. New apollo_daemon iterates Apollo's 164K+ company
+#    database filtered to Bahamas-buyer ICP (consulting/marketing/SaaS/
+#    design/coaching, 30-150 emp, US), scrapes each company website
+#    for emails, DNS-verifies (no BulkEmailChecker — DIY). Throughput
+#    ~10x the old daemon at zero per-verification cost.
 spawn_supervised "BAHAMAS_SCRAPER" \
-  "$PYTHON_BIN" bahamas_daemon.py \
-    --auto-sync-sheets --max-per-city 40 --cities-per-cycle 4 --cycle-rest-min 30 \
-    --sheet-name "Bahamas Retreat - Leads"
+  "$PYTHON_BIN" apollo_daemon.py --workers 10 --per-page 100 --max-pages 25
 
 log "All 3 daemons spawned. Waiting forever..."
 wait

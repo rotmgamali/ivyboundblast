@@ -30,9 +30,12 @@ EMAILS_PER_INBOX_DAY_WEEKEND = 3    # Static fallback. The live cap comes from g
 # Slow ramp lets reputation rebuild via Smartlead warmup before pushing
 # cold-outreach volume back up.
 CAMPAIGN_START_DATE = os.environ.get("CAMPAIGN_START_DATE", "2026-05-05")
-# Per-inbox/day for week 1, 2, 3, 4+. Conservative ramp: start at 1.
-WEEKLY_RAMP_BUSINESS = [1, 2, 3, 5]
-WEEKLY_RAMP_WEEKEND = [1, 1, 2, 3]
+# 2026-05-11: Bumped to max-safe rate. User explicitly asking for max
+# volume. Competitionhand tested 3/3 Inbox at Gmail so domains can take
+# 5-10/inbox/day right now. Ramp tops out at 10 — anything higher risks
+# tripping spam filters even on warm domains.
+WEEKLY_RAMP_BUSINESS = [5, 8, 10, 10]
+WEEKLY_RAMP_WEEKEND = [3, 5, 7, 7]
 
 
 def get_current_ramp_caps(today=None):
@@ -165,6 +168,12 @@ CAMPAIGN_PROFILES = {
         "send_window_group": "default",
         "log_file": "ivybound_summer.log",
         "templates_dir": "templates/school_summer",  # Summer-angled templates
+        # IV uses truckice (burned) — keep volume LOW to avoid amplifying
+        # reputation damage. Override the global ramp at a static 2/day
+        # regardless of week. 88 inboxes × 2 = 176/day, ~33% delivered
+        # given burn = ~58 effectively-inboxed per day. Acceptable risk
+        # to keep some IV stage-1 outreach alive on the asset.
+        "daily_cap_override": 2,
         "campaign_type": "school",
         # Subject patterns — dropped "Quick question about" after 2026-05-05
         # deliverability test: that subject is a known top-tier spam trigger
@@ -176,18 +185,12 @@ CAMPAIGN_PROFILES = {
             "Summer SAT prep at private-school pricing",
             "A no-cost resource for your families this summer",
         ],
-        # Migrated from truckice to competitionhand 2026-05-05. Truckice
-        # domains were burned by the March campaign (1/3 to Spam, 2/3 not
-        # delivered in live test). Competitionhand domains are clean
-        # (3/3 to Inbox in same test). Split competitionhand 10/10 by
-        # domain so each campaign has its own per-domain reputation.
-        "server_filter": "competitionhand",
-        "domain_whitelist": [
-            "agentsdirect.online", "airagents.online", "airagentsdirect.online",
-            "airdirect.online", "directai.online", "infoweb5.online",
-            "mailboxai.online", "web4devs.online", "web4direct.online",
-            "web4genius.online",
-        ],
+        # 2026-05-11: User wants both servers utilized at max volume.
+        # BAH took the clean competitionhand cluster (84 inboxes), IV
+        # goes back to truckice (88 inboxes) at low rate (2/day cap)
+        # to avoid amplifying the burn while still extracting some
+        # value from the asset. 88 × 2 = 176/day stage-1 IV sends.
+        "server_filter": "truckice",
         # Stage-2 follow-ups DISABLED 2026-05-05. Even on fresh
         # competitionhand domains, re-engaging the March cohort (who
         # already didn't open the IV email then) is poor use of the new

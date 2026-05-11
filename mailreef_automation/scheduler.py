@@ -83,7 +83,12 @@ class EmailScheduler:
         self._daily_cap = self._ramped_cap()
 
     def _ramped_cap(self):
-        """Per-inbox/day cap from the weekly ramp schedule, with safe fallback."""
+        """Per-inbox/day cap. Honors profile-level daily_cap_override first
+        (lets us pin a campaign at a fixed rate regardless of global ramp),
+        then falls back to the global weekly-ramp schedule."""
+        override = self.profile_config.get("daily_cap_override")
+        if override is not None:
+            return int(override)
         get_caps = getattr(self.config, 'get_current_ramp_caps', None)
         if callable(get_caps):
             caps = get_caps()
@@ -91,7 +96,11 @@ class EmailScheduler:
         return getattr(self.config, 'MAX_DAILY_SENDS_PER_INBOX', 20)
 
     def _ramp_targets(self, day_type):
-        """Per-inbox/day target for business or weekend, honoring the weekly ramp."""
+        """Per-inbox/day target for slot distribution. Honors the same
+        profile-level override as _ramped_cap above."""
+        override = self.profile_config.get("daily_cap_override")
+        if override is not None:
+            return int(override)
         get_caps = getattr(self.config, 'get_current_ramp_caps', None)
         if callable(get_caps):
             caps = get_caps()
