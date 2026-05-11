@@ -23,15 +23,21 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import random
 import signal
 import sys
 import time
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
 from urllib.parse import urlparse
 
 import requests
+import urllib3
+
+# Suppress InsecureRequestWarning — scraping small business sites with
+# misconfigured certs is unavoidable, and the warnings drown out everything
+# else in the Railway log buffer (500-line tail).
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+warnings.filterwarnings("ignore", category=urllib3.exceptions.InsecureRequestWarning)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
