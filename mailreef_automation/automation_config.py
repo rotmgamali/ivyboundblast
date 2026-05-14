@@ -221,10 +221,16 @@ CAMPAIGN_PROFILES = {
             "team retreat",
             "{{ company_name }}",
         ],
-        # 2026-05-10: All 84 competitionhand inboxes assigned to Bahamas
-        # (IVYBOUND_SUMMER paused per user priority). domain_whitelist
-        # removed so server_filter alone admits the full set.
-        "server_filter": "competitionhand",
+        # 2026-05-11: BAH expanded to BOTH servers. competitionhand is
+        # clean (3/3 Inbox in test), truckice is partially burned but
+        # contributes some volume. 172 live inboxes total.
+        # No server_filter = all live inboxes across both servers.
+        # Uniform 5/inbox/day cap = max-safe envelope for both: well within
+        # safe range for competitionhand, and conservative enough on
+        # truckice to avoid amplifying the existing burn.
+        # Total daily volume: 172 × 5 = 860 sends/day BAH.
+        "inbox_indices": (0, 200),  # admit all live inboxes (count is ~172)
+        "daily_cap_override": 5,
         "sender_identities_override": "BAHAMAS_SENDER_IDENTITIES",
         "system_prompt_template": (
             "You are {sender_name} from SerenitySpaces Bahamas, a private 4-villa luxury retreat property "
