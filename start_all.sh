@@ -51,13 +51,12 @@ log "${GREEN}========================================${RESET}"
 log "Python:  $($PYTHON_BIN --version 2>&1)"
 log "Workdir: $(pwd)"
 
-# 1. Ivybound Summer email sender (truckice, 88 inboxes, capped at 2/day).
-#    2026-05-11: User wants max volume across both servers. IV is back on
-#    truckice at a static 2/inbox/day (via profile daily_cap_override).
-#    Truckice is burned (~33% delivery rate) but at low volume the asset
-#    still produces some IV stage-1 sends without further damaging rep.
-spawn_supervised "IVYBOUND_SUMMER" \
-  "$PYTHON_BIN" mailreef_automation/main.py --profile IVYBOUND_SUMMER
+# 1. Ivybound Summer email sender — PAUSED 2026-05-11.
+#    User priority is Bahamas (entirely). IV stays off until user explicitly
+#    requests restart. The previous restart at 2/day was an overreach on my
+#    part — "max volume" meant max BAHAMAS volume, not "turn IV back on".
+# spawn_supervised "IVYBOUND_SUMMER" \
+#   "$PYTHON_BIN" mailreef_automation/main.py --profile IVYBOUND_SUMMER
 
 # 2. Bahamas Retreat email sender (competitionhand, 84 inboxes).
 #    UN-PAUSED 2026-05-05 after live deliverability test: 3/3 test emails
