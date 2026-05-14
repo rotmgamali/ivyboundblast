@@ -214,15 +214,33 @@ class EmailScheduler:
             self.logger.info("Weekend: All inboxes active")
         
         emails_assigned_per_inbox = {}
+        # Build inbox_id → server map for per-server cap lookup. Cached for the
+        # life of the scheduler instance so _execute_slot can also use it.
+        self._inbox_server_map = {}
         for inbox in active_inboxes:
             emails_assigned_per_inbox[inbox['id']] = 0
-            
-        for window in windows:
-            emails_per_inbox = window["emails_per_inbox"]
+            self._inbox_server_map[inbox['id']] = inbox.get('server', '')
+
+        # Per-server caps (e.g. {"competitionhand": 18, "truckice": 6}) override
+        # the global daily_cap_override / ramp on a per-inbox basis. Lets us
+        # push clean servers hard while keeping burned servers conservative.
+        server_caps = self.profile_config.get("server_caps") or {}
+        default_cap = self._daily_cap
+        num_windows = max(1, len(windows))
+
+        for window_idx, window in enumerate(windows):
             window_start = window["start"]
             window_end = window["end"]
-            
+
             for inbox_id in emails_assigned_per_inbox.keys():
+                # Per-inbox daily target based on server cap (or fallback)
+                server = self._inbox_server_map.get(inbox_id, "")
+                inbox_daily_cap = server_caps.get(server, default_cap)
+                # Distribute the daily cap evenly across the day's windows.
+                # Earlier windows pick up the remainder so cap is exact.
+                quotient, remainder = divmod(inbox_daily_cap, num_windows)
+                emails_per_inbox = quotient + (1 if window_idx < remainder else 0)
+
                 # We need to send 'emails_per_inbox' number of emails in this window
                 for _ in range(emails_per_inbox):
                     # Add random jitter
@@ -665,13 +683,18 @@ class EmailScheduler:
     def _execute_slot(self, inbox_id, scheduled_time):
         """Execute a single send slot with sequence prioritization"""
         profile_tag = self.profile_config.get("log_file", "?")
-        # --- DAILY CAP ENFORCEMENT ---
+        # --- DAILY CAP ENFORCEMENT (per-server when configured) ---
         today_key = f"{inbox_id}_{datetime.now(pytz.timezone('US/Eastern')).strftime('%Y%m%d')}"
         current_count = self._daily_send_counts.get(today_key, 0)
-        if current_count >= self._daily_cap:
-            print(f"[SCHEDULER:{profile_tag}] ⏸️ slot capped: {inbox_id} ({current_count}/{self._daily_cap})", flush=True)
+        # Look up the inbox's server-specific cap if profile defines one,
+        # otherwise fall back to the global daily cap.
+        server_caps = self.profile_config.get("server_caps") or {}
+        server = getattr(self, "_inbox_server_map", {}).get(inbox_id, "")
+        effective_cap = server_caps.get(server, self._daily_cap)
+        if current_count >= effective_cap:
+            print(f"[SCHEDULER:{profile_tag}] ⏸️ slot capped: {inbox_id} ({current_count}/{effective_cap})", flush=True)
             return  # daily cap reached for this inbox
-        print(f"[SCHEDULER:{profile_tag}] ⏰ SLOT FIRE inbox={inbox_id} count={current_count}/{self._daily_cap}", flush=True)
+        print(f"[SCHEDULER:{profile_tag}] ⏰ SLOT FIRE inbox={inbox_id} count={current_count}/{effective_cap}", flush=True)
 
         # --- ANTI-PATTERN JITTER: Random 0-30 second delay ---
         time.sleep(random.uniform(0, 30))

@@ -221,16 +221,19 @@ CAMPAIGN_PROFILES = {
             "team retreat",
             "{{ company_name }}",
         ],
-        # 2026-05-11: BAH expanded to BOTH servers. competitionhand is
-        # clean (3/3 Inbox in test), truckice is partially burned but
-        # contributes some volume. 172 live inboxes total.
-        # No server_filter = all live inboxes across both servers.
-        # Uniform 5/inbox/day cap = max-safe envelope for both: well within
-        # safe range for competitionhand, and conservative enough on
-        # truckice to avoid amplifying the existing burn.
-        # Total daily volume: 172 × 5 = 860 sends/day BAH.
+        # 2026-05-14: Per-server caps. competitionhand (clean) pushed
+        # to industry-safe ceiling for warmed cold-outreach domains.
+        # truckice (burned) kept conservative to limit further damage
+        # while still extracting some volume from the asset.
+        #   competitionhand: 84 × 18 = 1,512/day
+        #   truckice:        88 × 6  =   528/day
+        #   TOTAL:                     2,040/day (target was 2,000)
         "inbox_indices": (0, 200),  # admit all live inboxes (count is ~172)
-        "daily_cap_override": 5,
+        "server_caps": {
+            "competitionhand": 18,
+            "truckice": 6,
+        },
+        "daily_cap_override": 18,  # fallback for any inbox without a server match
         "sender_identities_override": "BAHAMAS_SENDER_IDENTITIES",
         "system_prompt_template": (
             "You are {sender_name} from SerenitySpaces Bahamas, a private 4-villa luxury retreat property "
