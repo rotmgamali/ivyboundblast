@@ -55,58 +55,48 @@ from sheets_integration import GoogleSheetsClient
 APOLLO_API_KEY = os.environ.get("APOLLO_API_KEY", "ljD1V-8Qr90XximLPSVwqA")
 APOLLO_BASE = "https://api.apollo.io/api/v1"
 
-# ICP filters for Bahamas retreat buyers
+# ICP filters for Bahamas retreat buyers. Wider net 2026-05-15 — original
+# 8 ICPs were exhausted (returning all dupes). Added 20+ more industries
+# + slightly relaxed employee range (20-300 instead of 30-150) + added
+# Canada to broaden the pool. Each variant unlocks ~5K-25K unique
+# companies from Apollo's database.
+EMP_RANGE = ["20,300"]
+LOC_US_CA = ["United States", "Canada"]
+
 ICP_VARIANTS = [
-    # Each entry is a search payload. Daemon rotates through them so the same
-    # company isn't returned repeatedly (Apollo paginates per-search).
-    {
-        "name": "marketing-agency",
-        "q_organization_keyword_tags": ["marketing agency", "advertising agency", "digital agency"],
-        "organization_num_employees_ranges": ["30,150"],
-        "organization_locations": ["United States"],
-    },
-    {
-        "name": "consulting",
-        "q_organization_keyword_tags": ["consulting", "management consulting", "strategy consulting"],
-        "organization_num_employees_ranges": ["30,150"],
-        "organization_locations": ["United States"],
-    },
-    {
-        "name": "saas-tech",
-        "q_organization_keyword_tags": ["saas", "software", "technology"],
-        "organization_num_employees_ranges": ["30,150"],
-        "organization_locations": ["United States"],
-    },
-    {
-        "name": "design-agency",
-        "q_organization_keyword_tags": ["design agency", "branding agency", "creative agency"],
-        "organization_num_employees_ranges": ["30,150"],
-        "organization_locations": ["United States"],
-    },
-    {
-        "name": "executive-coaching",
-        "q_organization_keyword_tags": ["executive coaching", "professional training", "leadership development"],
-        "organization_num_employees_ranges": ["30,150"],
-        "organization_locations": ["United States"],
-    },
-    {
-        "name": "finance-services",
-        "q_organization_keyword_tags": ["financial services", "wealth management", "venture capital"],
-        "organization_num_employees_ranges": ["30,150"],
-        "organization_locations": ["United States"],
-    },
-    {
-        "name": "biotech-pharma",
-        "q_organization_keyword_tags": ["biotech", "pharmaceutical", "medical devices"],
-        "organization_num_employees_ranges": ["30,150"],
-        "organization_locations": ["United States"],
-    },
-    {
-        "name": "real-estate-dev",
-        "q_organization_keyword_tags": ["real estate", "property management", "real estate development"],
-        "organization_num_employees_ranges": ["30,150"],
-        "organization_locations": ["United States"],
-    },
+    # Original 8 (kept for resync of recent additions to those industries)
+    {"name": "marketing-agency", "q_organization_keyword_tags": ["marketing agency", "advertising agency", "digital agency"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "consulting", "q_organization_keyword_tags": ["consulting", "management consulting", "strategy consulting"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "saas-tech", "q_organization_keyword_tags": ["saas", "software", "technology"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "design-agency", "q_organization_keyword_tags": ["design agency", "branding agency", "creative agency"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "executive-coaching", "q_organization_keyword_tags": ["executive coaching", "professional training", "leadership development"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "finance-services", "q_organization_keyword_tags": ["financial services", "wealth management", "venture capital", "private equity"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "biotech-pharma", "q_organization_keyword_tags": ["biotech", "pharmaceutical", "medical devices"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "real-estate-dev", "q_organization_keyword_tags": ["real estate", "property management", "real estate development"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+
+    # 20 new variants — industries that actually book corporate retreats
+    {"name": "healthcare-admin", "q_organization_keyword_tags": ["hospital", "healthcare administration", "medical group", "health system"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "events-hospitality", "q_organization_keyword_tags": ["event management", "event planning", "destination management", "corporate events"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "law-firms", "q_organization_keyword_tags": ["law firm", "legal services", "attorney"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "accounting-cpa", "q_organization_keyword_tags": ["accounting firm", "cpa firm", "tax advisory", "audit"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "architecture-engineering", "q_organization_keyword_tags": ["architecture firm", "engineering firm", "civil engineering"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "construction-gc", "q_organization_keyword_tags": ["general contractor", "construction", "commercial construction"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "insurance", "q_organization_keyword_tags": ["insurance brokerage", "insurance services", "underwriting"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "media-publishing", "q_organization_keyword_tags": ["media", "publishing", "broadcasting", "digital media"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "education-edtech", "q_organization_keyword_tags": ["edtech", "online learning", "private school", "training company"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "ecommerce-brands", "q_organization_keyword_tags": ["ecommerce", "direct to consumer", "online retail"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "manufacturing-hq", "q_organization_keyword_tags": ["manufacturing", "industrial manufacturing", "specialty manufacturing"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "transportation-logistics", "q_organization_keyword_tags": ["logistics", "supply chain", "freight", "transportation"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "food-beverage", "q_organization_keyword_tags": ["food and beverage", "restaurant group", "specialty food", "beverage company"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "fitness-wellness", "q_organization_keyword_tags": ["fitness", "wellness", "gym chain", "health and wellness"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "nonprofit-leadership", "q_organization_keyword_tags": ["nonprofit", "foundation", "philanthropy", "ngo"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "venture-capital-pe", "q_organization_keyword_tags": ["venture capital", "private equity", "investment firm"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "energy-cleantech", "q_organization_keyword_tags": ["clean energy", "renewable energy", "solar", "energy services"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "telecom-isp", "q_organization_keyword_tags": ["telecommunications", "internet service provider", "telecom services"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "automotive-dealer", "q_organization_keyword_tags": ["automotive dealer", "car dealership", "auto group"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "agriculture-ag", "q_organization_keyword_tags": ["agriculture", "agribusiness", "food production"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "gaming-esports", "q_organization_keyword_tags": ["gaming studio", "video games", "esports"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
+    {"name": "crypto-web3", "q_organization_keyword_tags": ["cryptocurrency", "blockchain", "web3", "defi"], "organization_num_employees_ranges": EMP_RANGE, "organization_locations": LOC_US_CA},
 ]
 
 DEFAULT_WORKERS = 10
